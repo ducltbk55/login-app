@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(npm *)"
+      "PowerShell(npm *)",
+      "PowerShell(node -e \"const {DatabaseSync}=require\\('node:sqlite'\\); const db=new DatabaseSync\\(':memory:'\\); db.exec\\('create table t\\(a text\\)'\\); db.prepare\\('insert into t values \\(?\\)'\\).run\\('ok'\\); console.log\\('node:sqlite OK ->', db.prepare\\('select a from t'\\).get\\(\\).a\\);\")",
+      "PowerShell(npx --yes @nestjs/cli@latest new backend --package-manager npm --skip-git --language TypeScript --strict)",
+      "PowerShell(node --env-file=D:\\\\login\\\\frontend\\\\.env.local \"C:\\\\Users\\\\LETRUN~1.DUC\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--login\\\\67538562-2385-4c78-9f47-90b80285162a\\\\scratchpad\\\\check-client.mjs\")"
     ]
   }
 }
