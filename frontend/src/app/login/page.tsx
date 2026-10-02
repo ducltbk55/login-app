@@ -11,6 +11,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   OAuthAccountNotLinked:
     "Email này đã được đăng ký bằng phương thức khác. Hãy dùng đúng phương thức ban đầu.",
   AccessDenied: "Bạn đã từ chối cấp quyền cho ứng dụng.",
+  AccountBlocked:
+    "Tài khoản của bạn đã bị khoá. Hãy liên hệ quản trị viên để được mở lại.",
   Configuration:
     "Cấu hình chưa đúng. Kiểm tra AUTH_SECRET, AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET trong .env.local.",
   CallbackRouteError:

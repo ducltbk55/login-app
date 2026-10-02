@@ -1,8 +1,16 @@
 import type { DefaultSession } from "next-auth";
 
-/** Các trường lấy từ backend NestJS, nhét vào JWT rồi ánh xạ sang session. */
+import type { UserRole } from "@/lib/users";
+
+/**
+ * Các trường lấy từ backend NestJS, nhét vào JWT rồi ánh xạ sang session.
+ *
+ * Lưu ý: đây là ảnh chụp lúc đăng nhập (JWT stateless). `role` ở đây chỉ dùng để
+ * hiện/ẩn link, còn cổng vào /admin luôn kiểm tra lại DB — xem `lib/admin.ts`.
+ */
 interface BackendClaims {
   provider?: string;
+  role?: UserRole;
   createdAt?: string;
   loginCount?: number;
   isNewUser?: boolean;

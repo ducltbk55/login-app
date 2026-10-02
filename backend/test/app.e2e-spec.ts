@@ -18,6 +18,13 @@ type SyncResponse = {
 type ListResponse = { total: number };
 
 describe('API (e2e)', () => {
+  const sync = (email: string) =>
+    request(app.getHttpServer())
+      .post('/api/users/sync')
+      .set('x-api-key', API_KEY)
+      .send({ email, provider: 'google' })
+      .expect(200);
+
   let app: INestApplication<App>;
   let tempDir: string;
 
@@ -94,5 +101,131 @@ describe('API (e2e)', () => {
       .set('x-api-key', API_KEY)
       .send({ email: 'khong-phai-email', provider: 'facebook' })
       .expect(400);
+  });
+
+  it('GET /api/users/stats đếm theo vai trò và trạng thái', async () => {
+    await sync('an@example.com');
+    await request(app.getHttpServer())
+      .patch('/api/users/an@example.com')
+      .set('x-api-key', API_KEY)
+      .send({ role: 'admin' })
+      .expect(200);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/users/stats')
+      .set('x-api-key', API_KEY)
+      .expect(200);
+
+    expect(response.body).toMatchObject({ total: 1, admins: 1, blocked: 0 });
+  });
+
+  it('PUT /api/users/:email/groups gán nhóm quyền', async () => {
+    await sync('an@example.com');
+    const group = await request(app.getHttpServer())
+      .post('/api/permission-groups')
+      .set('x-api-key', API_KEY)
+      .send({ name: 'Biên tập', permissions: ['categories.write'] })
+      .expect(201);
+
+    const groupId = (group.body as { id: string }).id;
+    const updated = await request(app.getHttpServer())
+      .put('/api/users/an@example.com/groups')
+      .set('x-api-key', API_KEY)
+      .send({ groupIds: [groupId] })
+      .expect(200);
+
+    expect(updated.body).toMatchObject({
+      groups: [{ id: groupId, slug: 'bien-tap' }],
+      permissions: ['categories.write'],
+    });
+  });
+
+  it('tài khoản bị khoá thì POST /users/sync trả 403', async () => {
+    await sync('an@example.com');
+    await request(app.getHttpServer())
+      .patch('/api/users/an@example.com')
+      .set('x-api-key', API_KEY)
+      .send({ status: 'blocked' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post('/api/users/sync')
+      .set('x-api-key', API_KEY)
+      .send({ email: 'an@example.com', provider: 'google' })
+      .expect(403);
+  });
+
+  it('CRUD /api/categories', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/categories')
+      .set('x-api-key', API_KEY)
+      .send({ name: 'Đồ gia dụng' })
+      .expect(201);
+
+    const id = (created.body as { id: string; slug: string }).id;
+    expect(created.body).toMatchObject({ slug: 'do-gia-dung', isActive: true });
+
+    const list = await request(app.getHttpServer())
+      .get('/api/categories?search=gia dung')
+      .set('x-api-key', API_KEY)
+      .expect(200);
+    expect(list.body).toMatchObject({ total: 1 });
+
+    const patched = await request(app.getHttpServer())
+      .patch(`/api/categories/${id}`)
+      .set('x-api-key', API_KEY)
+      .send({ isActive: false, sortOrder: 3 })
+      .expect(200);
+    expect(patched.body).toMatchObject({ isActive: false, sortOrder: 3 });
+
+    await request(app.getHttpServer())
+      .delete(`/api/categories/${id}`)
+      .set('x-api-key', API_KEY)
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .get(`/api/categories/${id}`)
+      .set('x-api-key', API_KEY)
+      .expect(404);
+  });
+
+  it('từ chối category thiếu name hoặc slug sai định dạng', async () => {
+    await request(app.getHttpServer())
+      .post('/api/categories')
+      .set('x-api-key', API_KEY)
+      .send({ name: '' })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/api/categories')
+      .set('x-api-key', API_KEY)
+      .send({ name: 'Hợp lệ', slug: 'Không Hợp Lệ' })
+      .expect(400);
+  });
+
+  it('GET /api/permissions trả danh mục quyền cố định', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/permissions')
+      .set('x-api-key', API_KEY)
+      .expect(200);
+
+    const items = (response.body as { items: { key: string }[] }).items;
+    expect(items.map((i) => i.key)).toContain('categories.write');
+  });
+
+  it('từ chối permission không có trong danh mục', async () => {
+    await request(app.getHttpServer())
+      .post('/api/permission-groups')
+      .set('x-api-key', API_KEY)
+      .send({ name: 'Nhóm lạ', permissions: ['dashboard.hack'] })
+      .expect(400);
+  });
+
+  it('mọi endpoint admin đều cần api key', async () => {
+    await request(app.getHttpServer()).get('/api/categories').expect(401);
+    await request(app.getHttpServer())
+      .get('/api/permission-groups')
+      .expect(401);
+    await request(app.getHttpServer()).get('/api/users/stats').expect(401);
   });
 });

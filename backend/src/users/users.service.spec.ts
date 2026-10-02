@@ -5,11 +5,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { DatabaseModule } from '../database/database.module';
+import { PermissionGroupsModule } from '../permission-groups/permission-groups.module';
+import { PermissionGroupsService } from '../permission-groups/permission-groups.service';
 import { UsersService } from './users.service';
 
 describe('UsersService', () => {
   let moduleRef: TestingModule;
   let users: UsersService;
+  let groups: PermissionGroupsService;
   let tempDir: string;
 
   beforeEach(async () => {
@@ -23,12 +26,14 @@ describe('UsersService', () => {
           load: [() => ({ DATABASE_FILE: path.join(tempDir, 'test.db') })],
         }),
         DatabaseModule,
+        PermissionGroupsModule,
       ],
       providers: [UsersService],
     }).compile();
 
     await moduleRef.init();
     users = moduleRef.get(UsersService);
+    groups = moduleRef.get(PermissionGroupsService);
   });
 
   afterEach(async () => {
@@ -47,6 +52,8 @@ describe('UsersService', () => {
     expect(result.isNewUser).toBe(true);
     expect(result.user.email).toBe('an@example.com');
     expect(result.user.loginCount).toBe(1);
+    expect(result.user.role).toBe('user');
+    expect(result.user.status).toBe('active');
     expect(users.countAll()).toBe(1);
   });
 
@@ -88,5 +95,102 @@ describe('UsersService', () => {
     expect(() => users.findByEmailOrFail('unknown@example.com')).toThrow(
       /Không tìm thấy người dùng/,
     );
+  });
+
+  describe('quản trị', () => {
+    beforeEach(() => {
+      users.sync({ email: 'an@example.com', name: 'An', provider: 'google' });
+    });
+
+    it('đổi vai trò và trạng thái', () => {
+      const promoted = users.update('an@example.com', { role: 'admin' });
+      expect(promoted.role).toBe('admin');
+      // Admin được coi là có toàn bộ quyền dù chưa gán nhóm nào.
+      expect(promoted.permissions.length).toBeGreaterThan(0);
+      expect(users.stats()).toMatchObject({ total: 1, admins: 1, blocked: 0 });
+    });
+
+    it('không cho hạ quyền admin cuối cùng', () => {
+      users.update('an@example.com', { role: 'admin' });
+
+      expect(() => users.update('an@example.com', { role: 'user' })).toThrow(
+        /admin duy nhất/,
+      );
+      expect(() =>
+        users.update('an@example.com', { status: 'blocked' }),
+      ).toThrow(/admin duy nhất/);
+    });
+
+    it('cho hạ quyền khi đã có admin khác', () => {
+      users.sync({ email: 'binh@example.com', provider: 'google' });
+      users.update('an@example.com', { role: 'admin' });
+      users.update('binh@example.com', { role: 'admin' });
+
+      expect(users.update('an@example.com', { role: 'user' }).role).toBe(
+        'user',
+      );
+    });
+
+    it('tài khoản bị khoá không đăng nhập được nữa', () => {
+      users.sync({ email: 'binh@example.com', provider: 'google' });
+      users.update('binh@example.com', { status: 'blocked' });
+
+      expect(() =>
+        users.sync({ email: 'binh@example.com', provider: 'google' }),
+      ).toThrow(/bị khoá/);
+      // Không được ghi thêm lịch sử đăng nhập cho lần bị chặn.
+      expect(users.findLoginHistory('binh@example.com')).toHaveLength(1);
+    });
+
+    it('gán nhóm quyền và tính quyền hiệu lực', () => {
+      const group = groups.create({
+        name: 'Biên tập danh mục',
+        permissions: ['categories.read', 'categories.write'],
+      });
+
+      const detail = users.setGroups('an@example.com', {
+        groupIds: [group.id],
+      });
+
+      expect(detail.groups.map((g) => g.slug)).toEqual(['bien-tap-danh-muc']);
+      expect(detail.permissions).toEqual([
+        'categories.read',
+        'categories.write',
+      ]);
+      expect(groups.findOneOrFail(group.id).memberCount).toBe(1);
+    });
+
+    it('gán nhóm là thay thế toàn bộ, không cộng dồn', () => {
+      const a = groups.create({ name: 'A', permissions: ['users.read'] });
+      const b = groups.create({ name: 'B', permissions: ['categories.read'] });
+
+      users.setGroups('an@example.com', { groupIds: [a.id] });
+      const after = users.setGroups('an@example.com', { groupIds: [b.id] });
+
+      expect(after.groups).toHaveLength(1);
+      expect(after.permissions).toEqual(['categories.read']);
+    });
+
+    it('từ chối gán nhóm không tồn tại', () => {
+      expect(() =>
+        users.setGroups('an@example.com', { groupIds: ['khong-ton-tai'] }),
+      ).toThrow(/Không tìm thấy nhóm quyền/);
+    });
+
+    it('lọc danh sách theo tên, vai trò, trạng thái', () => {
+      users.sync({
+        email: 'binh@example.com',
+        name: 'Bình',
+        provider: 'google',
+      });
+      users.update('binh@example.com', { role: 'admin' });
+
+      expect(users.findAll({ search: 'bình' }).map((u) => u.email)).toEqual([
+        'binh@example.com',
+      ]);
+      expect(users.findAll({ role: 'admin' })).toHaveLength(1);
+      expect(users.findAll({ status: 'blocked' })).toHaveLength(0);
+      expect(users.findAll()).toHaveLength(2);
+    });
   });
 });

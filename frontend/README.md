@@ -15,7 +15,12 @@ Phần giao diện và luồng OAuth; **dữ liệu người dùng do backend Ne
 | `src/app/page.tsx` | Trang chủ, đổi giao diện theo trạng thái đăng nhập |
 | `src/app/login/page.tsx` | Trang đăng nhập + thông báo lỗi OAuth bằng tiếng Việt |
 | `src/app/dashboard/page.tsx` | Trang cá nhân (được bảo vệ), đọc dữ liệu từ backend |
-| `src/components/` | `Card`, `Avatar`, nút đăng nhập Google, nút đăng xuất |
+| `src/app/admin/` | **Khu quản trị** `/admin/*` — layout tự chặn non-admin |
+| `src/lib/admin.ts` | `requireAdmin()` — cổng vào, đọc role từ DB chứ không từ JWT |
+| `src/lib/backend.ts` | Tầng gọi backend dùng chung (`request` / `requestOptional`) |
+| `src/lib/categories.ts`, `src/lib/permission-groups.ts` | Client cho từng resource |
+| `src/lib/styles.ts` | Class Tailwind dùng lại (nút, input, bảng) |
+| `src/components/` | `Card`, `Avatar`, `Badge`, form admin, nút submit/xoá |
 | `src/types/next-auth.d.ts` | Mở rộng kiểu `Session` / `JWT` với các trường tuỳ biến |
 
 ## Biến môi trường (`.env.local`)
@@ -53,11 +58,36 @@ Lệnh khác: `npm run build`, `npm run start`, `npm run lint`.
 Nếu backend không chạy, đăng nhập sẽ thất bại và trang `/login` hiện thông báo
 "…không lưu được dữ liệu…" thay vì âm thầm mất dữ liệu đăng ký.
 
+## Khu quản trị `/admin/*`
+
+| Route | Chức năng |
+| --- | --- |
+| `/admin` | Tổng quan: số người dùng / admin / bị khoá / danh mục / nhóm quyền |
+| `/admin/users` | Danh sách + lọc theo tên, vai trò, trạng thái |
+| `/admin/users/[email]` | Đổi role & status, gán nhóm quyền, xem quyền hiệu lực + lịch sử |
+| `/admin/categories` | Danh sách + lọc, bật/tắt nhanh, xoá |
+| `/admin/categories/new`, `/admin/categories/[id]` | Thêm / sửa |
+| `/admin/permission-groups` | Danh sách kèm số thành viên, xoá |
+| `/admin/permission-groups/new`, `/[id]` | Thêm / sửa, chọn quyền bằng checkbox |
+
+Cách phân quyền:
+
+- Cổng vào là `users.role === "admin"` **và** `status === "active"`, kiểm tra trong
+  `app/admin/layout.tsx` nên mọi trang con (kể cả trang thêm sau này) đều được bảo vệ.
+- `requireAdmin()` đọc lại từ DB mỗi request, **không** tin `session.user.role`: JWT là
+  ảnh chụp lúc đăng nhập nên nếu tin nó thì hạ quyền/khoá tài khoản sẽ không có hiệu lực
+  cho tới khi hết phiên. Cookie tự khai `role: "admin"` cũng không vào được.
+- Mỗi server action tự gọi `requireAdmin()`: server action là endpoint HTTP riêng, không
+  thừa hưởng bảo vệ của layout.
+- Nhóm quyền hiện là dữ liệu được quản lý + `permissions` hiệu lực trả về theo user; cổng
+  `/admin` vẫn dựa trên `role`. Muốn siết theo từng quyền thì kiểm tra
+  `user.permissions.includes("categories.write")` tại action/trang tương ứng.
+
 ## Ghi chú
 
 - Phiên đăng nhập dùng **JWT trong cookie httpOnly** (`session.strategy = "jwt"`), nên
   frontend không cần DB riêng.
-- `BACKEND_API_KEY` chỉ được đọc trong code server (`src/lib/users.ts`), không lộ ra browser.
+- `BACKEND_API_KEY` chỉ được đọc trong code server (`src/lib/backend.ts`), không lộ ra browser.
 - Trang bảo vệ kiểm tra phiên bằng `await auth()` ngay trong server component — cách kiểm
   tra đáng tin cậy nhất; có thể thêm `middleware.ts` nếu muốn chặn sớm ở tầng edge.
 - Ảnh đại diện Google được cho phép qua `images.remotePatterns` trong `next.config.ts`.

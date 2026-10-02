@@ -5,14 +5,25 @@ import {
   HttpCode,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 
 import { ApiKeyGuard } from '../common/api-key.guard';
+import { AssignGroupsDto } from './dto/assign-groups.dto';
+import { ListUsersDto } from './dto/list-users.dto';
 import { SyncUserDto } from './dto/sync-user.dto';
-import type { LoginEvent, SyncResult, User } from './user.entity';
+import { UpdateUserDto } from './dto/update-user.dto';
+import type {
+  LoginEvent,
+  SyncResult,
+  User,
+  UserDetail,
+  UserStats,
+} from './user.entity';
 import { UsersService } from './users.service';
 
 @Controller('users')
@@ -27,14 +38,21 @@ export class UsersController {
     return this.users.sync(dto);
   }
 
+  // Phải khai báo trước `:email`, nếu không "stats" sẽ bị hiểu là một email.
+  @Get('stats')
+  stats(): UserStats {
+    return this.users.stats();
+  }
+
   @Get()
-  findAll(): { total: number; items: User[] } {
-    return { total: this.users.countAll(), items: this.users.findAll() };
+  findAll(@Query() query: ListUsersDto): { total: number; items: User[] } {
+    const items = this.users.findAll(query);
+    return { total: items.length, items };
   }
 
   @Get(':email')
-  findOne(@Param('email') email: string): User {
-    return this.users.findByEmailOrFail(email);
+  findOne(@Param('email') email: string): UserDetail {
+    return this.users.findDetailOrFail(email);
   }
 
   @Get(':email/logins')
@@ -43,5 +61,23 @@ export class UsersController {
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ): { items: LoginEvent[] } {
     return { items: this.users.findLoginHistory(email, limit) };
+  }
+
+  /** Đổi vai trò / trạng thái (admin). */
+  @Patch(':email')
+  update(
+    @Param('email') email: string,
+    @Body() dto: UpdateUserDto,
+  ): UserDetail {
+    return this.users.update(email, dto);
+  }
+
+  /** Thay toàn bộ nhóm quyền của user (admin). */
+  @Put(':email/groups')
+  setGroups(
+    @Param('email') email: string,
+    @Body() dto: AssignGroupsDto,
+  ): UserDetail {
+    return this.users.setGroups(email, dto);
   }
 }

@@ -8,10 +8,11 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { formatDateTime } from "@/lib/format";
 import { findUserByEmail, getLoginHistory } from "@/lib/users";
 
-export default async function DashboardPage() {
+export default async function DashboardPage(props: PageProps<"/dashboard">) {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
+  const { denied } = await props.searchParams;
   const email = session.user.email;
   // Đọc trực tiếp từ backend NestJS để chứng minh dữ liệu đã được lưu.
   const [record, history] = await Promise.all([
@@ -25,6 +26,15 @@ export default async function DashboardPage() {
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-16">
       <Card className="space-y-8">
+        {denied === "admin" && (
+          <p
+            role="alert"
+            className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400"
+          >
+            Bạn không có quyền truy cập trang quản trị.
+          </p>
+        )}
+
         <header className="flex items-center gap-4">
           {image && <Avatar src={image} name={name} />}
           <div className="space-y-1">
@@ -87,7 +97,15 @@ export default async function DashboardPage() {
           </section>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {record?.role === "admin" && (
+            <Link
+              href="/admin"
+              className="rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background transition hover:opacity-90"
+            >
+              Trang quản trị
+            </Link>
+          )}
           <Link
             href="/"
             className="text-sm underline underline-offset-4 opacity-70 hover:opacity-100"

@@ -1,16 +1,27 @@
-/**
- * Client gọi backend NestJS. Đây là lớp duy nhất trong frontend biết về backend,
- * chỉ được dùng ở phía server (cần BACKEND_API_KEY, không bao giờ lộ ra browser).
- */
+import { request, requestOptional, segment } from "./backend";
+
+export type UserRole = "admin" | "user";
+export type UserStatus = "active" | "blocked";
+
 export type StoredUser = {
   id: string;
   email: string;
   name: string | null;
   image: string | null;
   provider: string;
+  role: UserRole;
+  status: UserStatus;
   createdAt: string;
   lastLoginAt: string;
   loginCount: number;
+};
+
+export type UserGroupRef = { id: string; name: string; slug: string };
+
+/** Bản ghi kèm nhóm quyền, dùng cho trang chi tiết trong admin. */
+export type StoredUserDetail = StoredUser & {
+  groups: UserGroupRef[];
+  permissions: string[];
 };
 
 export type LoginEvent = {
@@ -20,72 +31,13 @@ export type LoginEvent = {
   occurredAt: string;
 };
 
-const BACKEND_URL = (
-  process.env.BACKEND_URL ?? "http://localhost:4000/api"
-).replace(/\/$/, "");
+export type UserStats = { total: number; admins: number; blocked: number };
 
-class BackendError extends Error {
-  constructor(
-    message: string,
-    readonly status?: number,
-    options?: { cause?: unknown },
-  ) {
-    super(message, options);
-    this.name = "BackendError";
-  }
-}
-
-/** Gọi backend và bắt buộc phải có dữ liệu trả về, ngược lại throw. */
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const apiKey = process.env.BACKEND_API_KEY;
-  if (!apiKey) {
-    throw new BackendError(
-      "Thiếu BACKEND_API_KEY trong .env.local của frontend",
-    );
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(`${BACKEND_URL}${path}`, {
-      ...init,
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        ...init.headers,
-      },
-      cache: "no-store",
-    });
-  } catch (cause) {
-    throw new BackendError(
-      `Không kết nối được backend tại ${BACKEND_URL}. Hãy chắc chắn NestJS đang chạy.`,
-      undefined,
-      { cause },
-    );
-  }
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new BackendError(
-      `Backend trả về ${response.status} cho ${path}: ${body.slice(0, 300)}`,
-      response.status,
-    );
-  }
-
-  return (await response.json()) as T;
-}
-
-/** Như `request` nhưng 404 nghĩa là "chưa có dữ liệu" chứ không phải lỗi. */
-async function requestOptional<T>(
-  path: string,
-  init: RequestInit = {},
-): Promise<T | null> {
-  try {
-    return await request<T>(path, init);
-  } catch (error) {
-    if (error instanceof BackendError && error.status === 404) return null;
-    throw error;
-  }
-}
+export type ListUsersQuery = {
+  search?: string;
+  role?: UserRole;
+  status?: UserStatus;
+};
 
 /** Đăng ký (lần đầu) hoặc ghi nhận đăng nhập (các lần sau). */
 export async function registerOrLogin(input: {
@@ -107,8 +59,8 @@ export async function registerOrLogin(input: {
 
 export async function findUserByEmail(
   email: string,
-): Promise<StoredUser | null> {
-  return requestOptional<StoredUser>(`/users/${encodeURIComponent(email)}`);
+): Promise<StoredUserDetail | null> {
+  return requestOptional<StoredUserDetail>(`/users/${segment(email)}`);
 }
 
 export async function getLoginHistory(
@@ -116,7 +68,47 @@ export async function getLoginHistory(
   limit = 5,
 ): Promise<LoginEvent[]> {
   const result = await requestOptional<{ items: LoginEvent[] }>(
-    `/users/${encodeURIComponent(email)}/logins?limit=${limit}`,
+    `/users/${segment(email)}/logins?limit=${limit}`,
   );
   return result?.items ?? [];
+}
+
+export async function listUsers(
+  query: ListUsersQuery = {},
+): Promise<StoredUser[]> {
+  const params = new URLSearchParams();
+  if (query.search) params.set("search", query.search);
+  if (query.role) params.set("role", query.role);
+  if (query.status) params.set("status", query.status);
+
+  const suffix = params.size > 0 ? `?${params}` : "";
+  const result = await request<{ total: number; items: StoredUser[] }>(
+    `/users${suffix}`,
+  );
+  return result.items;
+}
+
+export async function getUserStats(): Promise<UserStats> {
+  return request<UserStats>("/users/stats");
+}
+
+export async function updateUser(
+  email: string,
+  input: { role?: UserRole; status?: UserStatus },
+): Promise<StoredUserDetail> {
+  return request<StoredUserDetail>(`/users/${segment(email)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Thay toàn bộ danh sách nhóm quyền của user. */
+export async function setUserGroups(
+  email: string,
+  groupIds: string[],
+): Promise<StoredUserDetail> {
+  return request<StoredUserDetail>(`/users/${segment(email)}/groups`, {
+    method: "PUT",
+    body: JSON.stringify({ groupIds }),
+  });
 }
