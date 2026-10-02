@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { COMPANY_NAME } from "@/lib/company";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,8 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Đăng nhập với Google",
-  description: "Demo đăng ký và đăng nhập bằng Google với Next.js + Auth.js",
+  // `template` để trang con chỉ cần đặt tiêu đề riêng, tên công ty tự nối vào.
+  title: {
+    default: COMPANY_NAME,
+    template: `%s · ${COMPANY_NAME}`,
+  },
+  description:
+    `Hệ thống quản trị tài khoản và danh mục của ${COMPANY_NAME}.`,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

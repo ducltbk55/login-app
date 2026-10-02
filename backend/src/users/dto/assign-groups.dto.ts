@@ -1,8 +1,8 @@
-import { ArrayUnique, IsArray, IsString } from 'class-validator';
+import { ArrayUnique, IsArray, IsInt } from 'class-validator';
 
 export class AssignGroupsDto {
   @IsArray()
   @ArrayUnique({ message: 'groupIds không được trùng' })
-  @IsString({ each: true })
-  groupIds!: string[];
+  @IsInt({ each: true, message: 'groupIds phải là số nguyên' })
+  groupIds!: number[];
 }

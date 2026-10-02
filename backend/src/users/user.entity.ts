@@ -5,7 +5,10 @@ export type UserRole = (typeof USER_ROLES)[number];
 export type UserStatus = (typeof USER_STATUSES)[number];
 
 export type User = {
-  id: string;
+  /** Khoá chính số, tự tăng. */
+  id: number;
+  /** GUID định danh tài khoản — chính là cột `id` kiểu TEXT ở schema cũ. */
+  accountId: string;
   email: string;
   name: string | null;
   image: string | null;
@@ -19,7 +22,7 @@ export type User = {
 
 /** Nhóm quyền ở dạng gọn để nhúng vào bản ghi người dùng. */
 export type UserGroupRef = {
-  id: string;
+  id: number;
   name: string;
   slug: string;
 };
@@ -32,8 +35,8 @@ export type UserDetail = User & {
 };
 
 export type LoginEvent = {
-  id: string;
-  userId: string;
+  id: number;
+  userId: number;
   provider: string;
   occurredAt: string;
 };

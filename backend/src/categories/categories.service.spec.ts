@@ -36,68 +36,74 @@ describe('CategoriesService', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('tự sinh slug từ tên tiếng Việt', () => {
+  it('tự sinh code từ tên tiếng Việt', () => {
     const created = categories.create({ name: 'Đồ gia dụng' });
 
-    expect(created.slug).toBe('do-gia-dung');
-    expect(created.isActive).toBe(true);
-    expect(created.sortOrder).toBe(0);
+    expect(typeof created.id).toBe('number');
+    expect(created.code).toBe('DO-GIA-DUNG');
+    expect(created.status).toBe('active');
+    // Thứ tự hiển thị đánh số từ 1 chứ không phải 0.
+    expect(created.order).toBe(1);
   });
 
-  it('nhận slug do người dùng nhập', () => {
-    expect(categories.create({ name: 'Sách', slug: 'sach-vo' }).slug).toBe(
-      'sach-vo',
+  it('nhận code do người dùng nhập và chuẩn hoá thành chữ hoa', () => {
+    expect(categories.create({ name: 'Sách', code: 'sach_vo' }).code).toBe(
+      'SACH_VO',
     );
   });
 
-  it('từ chối slug trùng', () => {
+  it('từ chối code trùng', () => {
     categories.create({ name: 'Sách' });
 
     expect(() => categories.create({ name: 'Sách' })).toThrow(/đã được dùng/);
+    // Trùng kể cả khi gõ khác hoa thường, vì code được chuẩn hoá trước khi so.
+    expect(() => categories.create({ name: 'Khác', code: 'sach' })).toThrow(
+      /đã được dùng/,
+    );
   });
 
   it('cập nhật giữ nguyên field không gửi lên', () => {
     const created = categories.create({
       name: 'Sách',
-      description: 'Mô tả',
-      sortOrder: 5,
+      descriptions: 'Mô tả',
+      order: 5,
     });
 
     const updated = categories.update(created.id, { name: 'Sách & Vở' });
 
     expect(updated.name).toBe('Sách & Vở');
-    expect(updated.slug).toBe('sach'); // slug không tự đổi theo name
-    expect(updated.description).toBe('Mô tả');
-    expect(updated.sortOrder).toBe(5);
+    expect(updated.code).toBe('SACH'); // code không tự đổi theo name
+    expect(updated.descriptions).toBe('Mô tả');
+    expect(updated.order).toBe(5);
     expect(updated.updatedAt >= created.updatedAt).toBe(true);
   });
 
-  it('đổi slug được, nhưng không đụng slug của bản ghi khác', () => {
+  it('đổi code được, nhưng không đụng code của bản ghi khác', () => {
     const a = categories.create({ name: 'A' });
     categories.create({ name: 'B' });
 
-    expect(categories.update(a.id, { slug: 'a-moi' }).slug).toBe('a-moi');
-    expect(() => categories.update(a.id, { slug: 'b' })).toThrow(
+    expect(categories.update(a.id, { code: 'a-moi' }).code).toBe('A-MOI');
+    expect(() => categories.update(a.id, { code: 'b' })).toThrow(
       /đã được dùng/,
     );
-    // Cập nhật chính nó với slug cũ thì không bị coi là trùng.
-    expect(categories.update(a.id, { slug: 'a-moi' }).slug).toBe('a-moi');
+    // Cập nhật chính nó với code cũ thì không bị coi là trùng.
+    expect(categories.update(a.id, { code: 'a-moi' }).code).toBe('A-MOI');
   });
 
   it('lọc theo từ khoá và trạng thái', () => {
     categories.create({ name: 'Điện tử' });
-    categories.create({ name: 'Thời trang', isActive: false });
+    categories.create({ name: 'Thời trang', status: 'inactive' });
 
     expect(categories.list({ search: 'điện' })).toHaveLength(1);
-    expect(categories.list({ isActive: false })).toHaveLength(1);
-    expect(categories.list({ isActive: true })).toHaveLength(1);
+    expect(categories.list({ status: 'inactive' })).toHaveLength(1);
+    expect(categories.list({ status: 'active' })).toHaveLength(1);
     expect(categories.list()).toHaveLength(2);
   });
 
-  it('sắp xếp theo sortOrder rồi đến tên', () => {
-    categories.create({ name: 'Zulu', sortOrder: 1 });
-    categories.create({ name: 'Alpha', sortOrder: 2 });
-    categories.create({ name: 'Beta', sortOrder: 1 });
+  it('sắp xếp theo order rồi đến tên', () => {
+    categories.create({ name: 'Zulu', order: 1 });
+    categories.create({ name: 'Alpha', order: 2 });
+    categories.create({ name: 'Beta', order: 1 });
 
     expect(categories.list().map((c) => c.name)).toEqual([
       'Beta',
@@ -106,12 +112,28 @@ describe('CategoriesService', () => {
     ]);
   });
 
+  it('danh sách kèm số chi tiết, mặc định là 0', () => {
+    categories.create({ name: 'Trống' });
+
+    expect(categories.list()[0].detailCount).toBe(0);
+  });
+
+  it('id là số tự tăng, không tái sử dụng sau khi xoá', () => {
+    const a = categories.create({ name: 'A' });
+    const b = categories.create({ name: 'B' });
+
+    expect(b.id).toBe(a.id + 1);
+
+    categories.remove(b.id);
+    expect(categories.create({ name: 'C' }).id).toBe(b.id + 1);
+  });
+
   it('xoá và báo lỗi khi id không tồn tại', () => {
     const created = categories.create({ name: 'Tạm' });
     categories.remove(created.id);
 
     expect(categories.count()).toBe(0);
     expect(() => categories.remove(created.id)).toThrow(/Không tìm thấy/);
-    expect(() => categories.findOneOrFail('abc')).toThrow(/Không tìm thấy/);
+    expect(() => categories.findOneOrFail(999)).toThrow(/Không tìm thấy/);
   });
 });

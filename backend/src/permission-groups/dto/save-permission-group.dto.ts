@@ -2,15 +2,12 @@ import { Transform } from 'class-transformer';
 import {
   ArrayUnique,
   IsArray,
-  IsIn,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
-
-import { PERMISSION_KEYS } from '../../common/permissions';
 
 export class CreatePermissionGroupDto {
   @IsString()
@@ -35,13 +32,11 @@ export class CreatePermissionGroupDto {
   @MaxLength(500)
   description?: string | null;
 
+  /** Danh mục quyền nằm trong DB nên việc đối chiếu do service làm. */
   @IsOptional()
   @IsArray()
   @ArrayUnique()
-  @IsIn(PERMISSION_KEYS, {
-    each: true,
-    message: 'permission không có trong danh mục quyền của hệ thống',
-  })
+  @IsString({ each: true })
   permissions?: string[];
 }
 
@@ -68,12 +63,10 @@ export class UpdatePermissionGroupDto {
   @MaxLength(500)
   description?: string | null;
 
+  /** Danh mục quyền nằm trong DB nên việc đối chiếu do service làm. */
   @IsOptional()
   @IsArray()
   @ArrayUnique()
-  @IsIn(PERMISSION_KEYS, {
-    each: true,
-    message: 'permission không có trong danh mục quyền của hệ thống',
-  })
+  @IsString({ each: true })
   permissions?: string[];
 }

@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink, PageHeader } from "@/components/admin/page-header";
 import { PermissionGroupForm } from "@/components/admin/permission-group-form";
 import {
+  findPermissionCatalogHref,
   findPermissionGroup,
   listPermissions,
 } from "@/lib/permission-groups";
@@ -12,25 +13,22 @@ export default async function EditPermissionGroupPage(
   props: PageProps<"/admin/permission-groups/[id]">,
 ) {
   const { id } = await props.params;
-  const [group, permissions] = await Promise.all([
+  const [group, permissions, catalogHref] = await Promise.all([
     findPermissionGroup(id),
     listPermissions(),
+    findPermissionCatalogHref(),
   ]);
 
   if (!group) notFound();
 
   return (
     <div className="space-y-5">
-      <Link
-        href="/admin/permission-groups"
-        className="text-sm underline underline-offset-4 opacity-70 hover:opacity-100"
-      >
-        ← Danh sách nhóm quyền
-      </Link>
-      <h2 className="text-base font-semibold">Sửa nhóm: {group.name}</h2>
+      <BackLink href="/admin/permission-groups">Danh sách nhóm quyền</BackLink>
+      <PageHeader title={`Sửa nhóm: ${group.name}`} description={group.slug} />
       <PermissionGroupForm
         group={group}
         permissions={permissions}
+        permissionCatalogHref={catalogHref}
         action={updatePermissionGroupAction.bind(null, group.id)}
       />
     </div>

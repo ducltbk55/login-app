@@ -47,6 +47,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         });
 
         token.userId = stored.id;
+        token.accountId = stored.accountId;
         token.provider = stored.provider;
         token.role = stored.role;
         token.createdAt = stored.createdAt;
@@ -58,7 +59,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
 
     async session({ session, token }) {
-      session.user.id = token.userId ?? session.user.id;
+      // next-auth quy ước `user.id` là chuỗi, còn khoá chính giờ là số.
+      session.user.id =
+        token.userId === undefined ? session.user.id : String(token.userId);
+      session.user.accountId = token.accountId;
       session.user.provider = token.provider;
       session.user.role = token.role;
       session.user.createdAt = token.createdAt;

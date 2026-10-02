@@ -55,7 +55,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
           <dl className="grid gap-px overflow-hidden rounded-xl border border-black/10 bg-black/10 text-sm sm:grid-cols-2 dark:border-white/15 dark:bg-white/15">
             <Field
               label="Mã người dùng"
-              value={record?.id ?? session.user.id}
+              value={String(record?.id ?? session.user.id)}
               mono
             />
             <Field label="Nhà cung cấp" value={record?.provider ?? "google"} />

@@ -4,7 +4,10 @@ export type UserRole = "admin" | "user";
 export type UserStatus = "active" | "blocked";
 
 export type StoredUser = {
-  id: string;
+  /** Khoá chính số, tự tăng. */
+  id: number;
+  /** GUID định danh tài khoản — trước đây chính là cột `id`. */
+  accountId: string;
   email: string;
   name: string | null;
   image: string | null;
@@ -16,7 +19,7 @@ export type StoredUser = {
   loginCount: number;
 };
 
-export type UserGroupRef = { id: string; name: string; slug: string };
+export type UserGroupRef = { id: number; name: string; slug: string };
 
 /** Bản ghi kèm nhóm quyền, dùng cho trang chi tiết trong admin. */
 export type StoredUserDetail = StoredUser & {
@@ -25,8 +28,8 @@ export type StoredUserDetail = StoredUser & {
 };
 
 export type LoginEvent = {
-  id: string;
-  userId: string;
+  id: number;
+  userId: number;
   provider: string;
   occurredAt: string;
 };
@@ -105,7 +108,7 @@ export async function updateUser(
 /** Thay toàn bộ danh sách nhóm quyền của user. */
 export async function setUserGroups(
   email: string,
-  groupIds: string[],
+  groupIds: number[],
 ): Promise<StoredUserDetail> {
   return request<StoredUserDetail>(`/users/${segment(email)}/groups`, {
     method: "PUT",

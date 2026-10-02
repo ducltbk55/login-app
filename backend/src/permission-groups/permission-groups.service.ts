@@ -5,19 +5,17 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
-
-import { PERMISSION_KEYS } from '../common/permissions';
 import { slugify } from '../common/slugify';
 import { SqliteService } from '../database/sqlite.service';
 import {
   CreatePermissionGroupDto,
   UpdatePermissionGroupDto,
 } from './dto/save-permission-group.dto';
+import { PermissionCatalogService } from './permission-catalog.service';
 import { PermissionGroup } from './permission-group.entity';
 
 type GroupRow = {
-  id: string;
+  id: number;
   name: string;
   slug: string;
   description: string | null;
@@ -31,17 +29,22 @@ export const ADMIN_GROUP_SLUG = 'administrators';
 export class PermissionGroupsService implements OnModuleInit {
   private readonly logger = new Logger(PermissionGroupsService.name);
 
-  constructor(private readonly sqlite: SqliteService) {}
+  constructor(
+    private readonly sqlite: SqliteService,
+    private readonly catalog: PermissionCatalogService,
+  ) {}
 
   /** Tạo sẵn nhóm "Administrators" (đủ quyền) nếu DB chưa có nhóm nào. */
   onModuleInit(): void {
+    // Nhóm mặc định cần danh mục quyền đã có dữ liệu.
+    this.catalog.ensureSeeded();
     if (this.count() > 0) return;
 
     this.create({
       name: 'Administrators',
       slug: ADMIN_GROUP_SLUG,
       description: 'Nhóm mặc định, có toàn bộ quyền của hệ thống',
-      permissions: [...PERMISSION_KEYS],
+      permissions: this.catalog.keys(),
     });
     this.logger.log('Đã tạo nhóm quyền mặc định "Administrators"');
   }
@@ -54,14 +57,14 @@ export class PermissionGroupsService implements OnModuleInit {
     return rows.map((row) => this.hydrate(row));
   }
 
-  findOne(id: string): PermissionGroup | null {
+  findOne(id: number): PermissionGroup | null {
     const row = this.sqlite.db
       .prepare('SELECT * FROM permission_groups WHERE id = ?')
       .get(id) as GroupRow | undefined;
     return row ? this.hydrate(row) : null;
   }
 
-  findOneOrFail(id: string): PermissionGroup {
+  findOneOrFail(id: number): PermissionGroup {
     const group = this.findOne(id);
     if (!group) {
       throw new NotFoundException(`Không tìm thấy nhóm quyền ${id}`);
@@ -78,24 +81,24 @@ export class PermissionGroupsService implements OnModuleInit {
 
   create(dto: CreatePermissionGroupDto): PermissionGroup {
     const now = new Date().toISOString();
-    const id = randomUUID();
     const slug = this.resolveSlug(dto.slug, dto.name);
 
     return this.sqlite.transaction(() => {
-      this.sqlite.db
+      const result = this.sqlite.db
         .prepare(
           `INSERT INTO permission_groups
-             (id, name, slug, description, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+             (name, slug, description, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?)`,
         )
-        .run(id, dto.name, slug, dto.description?.trim() || null, now, now);
+        .run(dto.name, slug, dto.description?.trim() || null, now, now);
 
+      const id = Number(result.lastInsertRowid);
       this.replacePermissions(id, dto.permissions ?? []);
       return this.findOneOrFail(id);
     });
   }
 
-  update(id: string, dto: UpdatePermissionGroupDto): PermissionGroup {
+  update(id: number, dto: UpdatePermissionGroupDto): PermissionGroup {
     const existing = this.findOneOrFail(id);
     const name = dto.name ?? existing.name;
     const slug =
@@ -128,7 +131,7 @@ export class PermissionGroupsService implements OnModuleInit {
   }
 
   /** Xoá nhóm; ON DELETE CASCADE tự dọn quyền và các liên kết với user. */
-  remove(id: string): void {
+  remove(id: number): void {
     this.findOneOrFail(id);
     this.sqlite.db
       .prepare('DELETE FROM permission_groups WHERE id = ?')
@@ -136,7 +139,7 @@ export class PermissionGroupsService implements OnModuleInit {
   }
 
   /** Kiểm tra toàn bộ id có tồn tại, dùng trước khi gán nhóm cho user. */
-  assertAllExist(ids: string[]): void {
+  assertAllExist(ids: number[]): void {
     for (const id of ids) {
       this.findOneOrFail(id);
     }
@@ -158,12 +161,15 @@ export class PermissionGroupsService implements OnModuleInit {
 
     return {
       ...row,
+      id: Number(row.id),
       permissions: permissions.map((p) => p.permission),
       memberCount: Number(members?.total ?? 0),
     };
   }
 
-  private replacePermissions(groupId: string, permissions: string[]): void {
+  private replacePermissions(groupId: number, permissions: string[]): void {
+    this.catalog.assertAllExist(permissions);
+
     this.sqlite.db
       .prepare('DELETE FROM permission_group_permissions WHERE groupId = ?')
       .run(groupId);
@@ -177,7 +183,7 @@ export class PermissionGroupsService implements OnModuleInit {
     }
   }
 
-  private resolveSlug(slug: string | undefined, name: string, id?: string) {
+  private resolveSlug(slug: string | undefined, name: string, id?: number) {
     const value = slug?.trim() || slugify(name);
     if (!value) {
       throw new ConflictException(
@@ -189,7 +195,7 @@ export class PermissionGroupsService implements OnModuleInit {
       .prepare(
         'SELECT id FROM permission_groups WHERE slug = ? AND id IS NOT ?',
       )
-      .get(value, id ?? null) as { id: string } | undefined;
+      .get(value, id ?? null) as { id: number } | undefined;
 
     if (clash) {
       throw new ConflictException(`Slug "${value}" đã được dùng`);

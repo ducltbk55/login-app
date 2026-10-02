@@ -1,23 +1,27 @@
-import Link from "next/link";
-
+import { BackLink, PageHeader } from "@/components/admin/page-header";
 import { PermissionGroupForm } from "@/components/admin/permission-group-form";
-import { listPermissions } from "@/lib/permission-groups";
+import {
+  findPermissionCatalogHref,
+  listPermissions,
+} from "@/lib/permission-groups";
 import { createPermissionGroupAction } from "../actions";
 
 export default async function NewPermissionGroupPage() {
-  const permissions = await listPermissions();
+  const [permissions, catalogHref] = await Promise.all([
+    listPermissions(),
+    findPermissionCatalogHref(),
+  ]);
 
   return (
     <div className="space-y-5">
-      <Link
-        href="/admin/permission-groups"
-        className="text-sm underline underline-offset-4 opacity-70 hover:opacity-100"
-      >
-        ← Danh sách nhóm quyền
-      </Link>
-      <h2 className="text-base font-semibold">Thêm nhóm quyền</h2>
+      <BackLink href="/admin/permission-groups">Danh sách nhóm quyền</BackLink>
+      <PageHeader
+        title="Thêm nhóm quyền"
+        description="Chọn các quyền nhóm này được phép dùng."
+      />
       <PermissionGroupForm
         permissions={permissions}
+        permissionCatalogHref={catalogHref}
         action={createPermissionGroupAction}
       />
     </div>

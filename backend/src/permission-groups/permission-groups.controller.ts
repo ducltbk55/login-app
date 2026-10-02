@@ -5,13 +5,15 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 
 import { ApiKeyGuard } from '../common/api-key.guard';
-import { PERMISSIONS } from '../common/permissions';
+import type { PermissionDef } from '../common/permissions';
+import { PermissionCatalogService } from './permission-catalog.service';
 import {
   CreatePermissionGroupDto,
   UpdatePermissionGroupDto,
@@ -22,12 +24,15 @@ import { PermissionGroupsService } from './permission-groups.service';
 @Controller()
 @UseGuards(ApiKeyGuard)
 export class PermissionGroupsController {
-  constructor(private readonly groups: PermissionGroupsService) {}
+  constructor(
+    private readonly groups: PermissionGroupsService,
+    private readonly catalog: PermissionCatalogService,
+  ) {}
 
-  /** Danh mục quyền cố định của hệ thống, để admin render checkbox. */
+  /** Quyền đang bật trong danh mục quyền, để admin render checkbox. */
   @Get('permissions')
-  catalog(): { items: typeof PERMISSIONS } {
-    return { items: PERMISSIONS };
+  permissions(): { items: PermissionDef[] } {
+    return { items: this.catalog.list() };
   }
 
   @Get('permission-groups')
@@ -37,7 +42,7 @@ export class PermissionGroupsController {
   }
 
   @Get('permission-groups/:id')
-  findOne(@Param('id') id: string): PermissionGroup {
+  findOne(@Param('id', ParseIntPipe) id: number): PermissionGroup {
     return this.groups.findOneOrFail(id);
   }
 
@@ -48,7 +53,7 @@ export class PermissionGroupsController {
 
   @Patch('permission-groups/:id')
   update(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdatePermissionGroupDto,
   ): PermissionGroup {
     return this.groups.update(id, dto);
@@ -56,7 +61,7 @@ export class PermissionGroupsController {
 
   @Delete('permission-groups/:id')
   @HttpCode(204)
-  remove(@Param('id') id: string): void {
+  remove(@Param('id', ParseIntPipe) id: number): void {
     this.groups.remove(id);
   }
 }

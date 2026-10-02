@@ -3,12 +3,42 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Bảng màu xanh thương hiệu dùng chung cho khu quản trị. */
+  --brand-50: #eef5ff;
+  --brand-100: #d9e8ff;
+  --brand-200: #bcd7ff;
+  --brand-300: #8ebeff;
+  --brand-400: #5a9bff;
+  --brand-500: #2f77f5;
+  --brand-600: #1a59db;
+  --brand-700: #1646b2;
+  --brand-800: #173b8d;
+  --brand-900: #183472;
+  --brand-950: #0f2047;
+
+  /* Bề mặt của riêng trang quản trị (đảo màu ở khối dark bên dưới). */
+  --admin-bg: #eef3fb;
+  --admin-surface: #ffffff;
+  --admin-surface-2: #f6f9ff;
+  --admin-border: #dce7f7;
+  --admin-text: #0e1b30;
+  --admin-muted: #5a6b88;
+  --admin-shadow: 0 1px 2px rgb(16 32 71 / 0.06), 0 8px 24px -16px rgb(16 32 71 / 0.35);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+
+    --admin-bg: #070d1a;
+    --admin-surface: #0f1829;
+    --admin-surface-2: #131f36;
+    --admin-border: #22314d;
+    --admin-text: #e8eefb;
+    --admin-muted: #93a3c0;
+    --admin-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -16px rgb(0 0 0 / 0.8);
   }
 }
 
@@ -17,10 +47,52 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-brand-950: var(--brand-950);
+
+  --color-admin-bg: var(--admin-bg);
+  --color-admin-surface: var(--admin-surface);
+  --color-admin-surface-2: var(--admin-surface-2);
+  --color-admin-border: var(--admin-border);
+  --color-admin-text: var(--admin-text);
+  --color-admin-muted: var(--admin-muted);
+
+  --shadow-admin: var(--admin-shadow);
 }
 
 /* Font do class `font-sans` trên <body> quyết định (xem app/layout.tsx). */
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+/* Thanh cuộn mảnh cho bảng dữ liệu rộng trong khu quản trị. */
+.admin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand-300) transparent;
+}
+
+.admin-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.admin-scroll::-webkit-scrollbar-thumb {
+  background: var(--brand-300);
+  border-radius: 9999px;
+}
+
+/* Ngăn cuộn nền khi mở ngăn kéo điều hướng trên mobile. */
+body:has(.admin-drawer-open) {
+  overflow: hidden;
 }

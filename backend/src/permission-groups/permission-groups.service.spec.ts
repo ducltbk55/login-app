@@ -4,8 +4,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { PERMISSION_KEYS } from '../common/permissions';
+import { CategoriesService } from '../categories/categories.service';
+import { CategoryDetailsService } from '../categories/category-details.service';
 import { DatabaseModule } from '../database/database.module';
+import { PermissionCatalogService } from './permission-catalog.service';
 import {
   ADMIN_GROUP_SLUG,
   PermissionGroupsService,
@@ -14,6 +16,7 @@ import {
 describe('PermissionGroupsService', () => {
   let moduleRef: TestingModule;
   let groups: PermissionGroupsService;
+  let catalog: PermissionCatalogService;
   let tempDir: string;
 
   beforeEach(async () => {
@@ -28,11 +31,17 @@ describe('PermissionGroupsService', () => {
         }),
         DatabaseModule,
       ],
-      providers: [PermissionGroupsService],
+      providers: [
+        PermissionGroupsService,
+        PermissionCatalogService,
+        CategoriesService,
+        CategoryDetailsService,
+      ],
     }).compile();
 
     await moduleRef.init();
     groups = moduleRef.get(PermissionGroupsService);
+    catalog = moduleRef.get(PermissionCatalogService);
   });
 
   afterEach(async () => {
@@ -45,7 +54,7 @@ describe('PermissionGroupsService', () => {
 
     expect(seeded).toHaveLength(1);
     expect(seeded[0].slug).toBe(ADMIN_GROUP_SLUG);
-    expect(seeded[0].permissions).toEqual([...PERMISSION_KEYS].sort());
+    expect(seeded[0].permissions).toEqual(catalog.keys().slice().sort());
     expect(seeded[0].memberCount).toBe(0);
   });
 
@@ -59,13 +68,13 @@ describe('PermissionGroupsService', () => {
   it('tạo nhóm với slug tự sinh và quyền được chọn', () => {
     const created = groups.create({
       name: 'Biên tập viên',
-      permissions: ['categories.read', 'categories.write'],
+      permissions: ['CATEGORIES.READ', 'CATEGORIES.WRITE'],
     });
 
     expect(created.slug).toBe('bien-tap-vien');
     expect(created.permissions).toEqual([
-      'categories.read',
-      'categories.write',
+      'CATEGORIES.READ',
+      'CATEGORIES.WRITE',
     ]);
   });
 
@@ -82,32 +91,32 @@ describe('PermissionGroupsService', () => {
   it('cập nhật quyền là thay thế toàn bộ', () => {
     const created = groups.create({
       name: 'Nhóm A',
-      permissions: ['users.read', 'users.write'],
+      permissions: ['USERS.READ', 'USERS.WRITE'],
     });
 
     const updated = groups.update(created.id, {
-      permissions: ['categories.read'],
+      permissions: ['CATEGORIES.READ'],
     });
 
-    expect(updated.permissions).toEqual(['categories.read']);
+    expect(updated.permissions).toEqual(['CATEGORIES.READ']);
   });
 
   it('không gửi permissions thì giữ nguyên quyền cũ', () => {
     const created = groups.create({
       name: 'Nhóm A',
-      permissions: ['users.read'],
+      permissions: ['USERS.READ'],
     });
 
     const updated = groups.update(created.id, { name: 'Nhóm A2' });
 
     expect(updated.name).toBe('Nhóm A2');
-    expect(updated.permissions).toEqual(['users.read']);
+    expect(updated.permissions).toEqual(['USERS.READ']);
   });
 
   it('xoá nhóm kéo theo bảng quyền của nhóm (ON DELETE CASCADE)', () => {
     const created = groups.create({
       name: 'Tạm',
-      permissions: ['users.read'],
+      permissions: ['USERS.READ'],
     });
 
     groups.remove(created.id);
@@ -120,8 +129,8 @@ describe('PermissionGroupsService', () => {
     const created = groups.create({ name: 'Nhóm A' });
 
     expect(() => groups.assertAllExist([created.id])).not.toThrow();
-    expect(() =>
-      groups.assertAllExist([created.id, 'la-hoac-khong-co']),
-    ).toThrow(/Không tìm thấy nhóm quyền/);
+    expect(() => groups.assertAllExist([created.id, 9999])).toThrow(
+      /Không tìm thấy nhóm quyền/,
+    );
   });
 });

@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
 
 const TONES = {
-  neutral: "bg-black/5 text-foreground/70 dark:bg-white/10",
+  neutral:
+    "bg-admin-surface-2 text-admin-muted ring-admin-border",
+  brand: "bg-brand-500/12 text-brand-700 ring-brand-500/25 dark:text-brand-300",
   success:
-    "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  danger: "bg-red-500/15 text-red-600 dark:text-red-400",
-  info: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+    "bg-emerald-500/12 text-emerald-700 ring-emerald-500/25 dark:text-emerald-400",
+  danger: "bg-red-500/12 text-red-700 ring-red-500/25 dark:text-red-400",
+  info: "bg-brand-500/12 text-brand-700 ring-brand-500/25 dark:text-brand-300",
 } as const;
 
 export type BadgeTone = keyof typeof TONES;
@@ -19,7 +21,7 @@ export function Badge({
 }) {
   return (
     <span
-      className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium ${TONES[tone]}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${TONES[tone]}`}
     >
       {children}
     </span>

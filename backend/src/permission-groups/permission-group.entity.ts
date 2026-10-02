@@ -1,5 +1,5 @@
 export type PermissionGroup = {
-  id: string;
+  id: number;
   name: string;
   slug: string;
   description: string | null;

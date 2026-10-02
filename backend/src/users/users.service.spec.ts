@@ -145,7 +145,7 @@ describe('UsersService', () => {
     it('gán nhóm quyền và tính quyền hiệu lực', () => {
       const group = groups.create({
         name: 'Biên tập danh mục',
-        permissions: ['categories.read', 'categories.write'],
+        permissions: ['CATEGORIES.READ', 'CATEGORIES.WRITE'],
       });
 
       const detail = users.setGroups('an@example.com', {
@@ -154,26 +154,26 @@ describe('UsersService', () => {
 
       expect(detail.groups.map((g) => g.slug)).toEqual(['bien-tap-danh-muc']);
       expect(detail.permissions).toEqual([
-        'categories.read',
-        'categories.write',
+        'CATEGORIES.READ',
+        'CATEGORIES.WRITE',
       ]);
       expect(groups.findOneOrFail(group.id).memberCount).toBe(1);
     });
 
     it('gán nhóm là thay thế toàn bộ, không cộng dồn', () => {
-      const a = groups.create({ name: 'A', permissions: ['users.read'] });
-      const b = groups.create({ name: 'B', permissions: ['categories.read'] });
+      const a = groups.create({ name: 'A', permissions: ['USERS.READ'] });
+      const b = groups.create({ name: 'B', permissions: ['CATEGORIES.READ'] });
 
       users.setGroups('an@example.com', { groupIds: [a.id] });
       const after = users.setGroups('an@example.com', { groupIds: [b.id] });
 
       expect(after.groups).toHaveLength(1);
-      expect(after.permissions).toEqual(['categories.read']);
+      expect(after.permissions).toEqual(['CATEGORIES.READ']);
     });
 
     it('từ chối gán nhóm không tồn tại', () => {
       expect(() =>
-        users.setGroups('an@example.com', { groupIds: ['khong-ton-tai'] }),
+        users.setGroups('an@example.com', { groupIds: [9999] }),
       ).toThrow(/Không tìm thấy nhóm quyền/);
     });
 

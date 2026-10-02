@@ -18,12 +18,17 @@ native module (`sqlite3`, `better-sqlite3`) hay chạy migration tool nào.
 | `src/users/dto/sync-user.dto.ts` | Validate payload bằng `class-validator` |
 | `src/common/api-key.guard.ts` | Chặn request không có `x-api-key` đúng (so sánh timing-safe) |
 | `src/health/health.controller.ts` | `/api/health` (không cần api key) |
-| `src/categories/` | CRUD danh mục (slug duy nhất, tự sinh từ tên) |
+| `src/categories/` | CRUD danh mục + chi tiết danh mục (code tự sinh từ tên) |
 | `src/permission-groups/` | CRUD nhóm quyền + seed nhóm `administrators` |
-| `src/common/permissions.ts` | Danh mục quyền cố định của hệ thống |
+| `src/common/permissions.ts` | Hạt giống danh mục quyền + suy ra nhóm hiển thị |
+| `src/permission-groups/permission-catalog.service.ts` | Danh mục quyền đọc từ DB (chi tiết của danh mục `DM_QUYEN`) |
 | `src/common/slugify.ts` | Sinh slug, bỏ dấu tiếng Việt |
+| `src/common/code.ts` | Chuẩn hoá `code` (bỏ dấu, viết hoa) |
 | `src/common/search.ts` | So khớp không phân biệt hoa thường/dấu |
+| `src/common/pagination.ts` | Cắt trang (mặc định 20, tối đa 200/trang) |
 | `scripts/set-role.mjs` | Bootstrap admin đầu tiên (`npm run set-role`) |
+| `scripts/seed-vn-administrative.ts` | Nạp 34 tỉnh/thành + 3321 phường/xã (`npm run seed:vn`) |
+| `src/categories/vn-administrative-order.ts` | Quy tắc sắp xếp: thành phố trước tỉnh, phường trước xã trước đặc khu |
 
 ## Biến môi trường (`.env.local`)
 
@@ -54,11 +59,13 @@ npm run build && npm run start:prod
 | GET | `/api/users/stats` | `{ total, admins, blocked }` |
 | PATCH | `/api/users/:email` | Đổi `role` / `status` |
 | PUT | `/api/users/:email/groups` | Thay toàn bộ nhóm quyền của user |
-| GET | `/api/permissions` | Danh mục quyền cố định |
+| GET | `/api/permissions` | Quyền đang bật, đọc từ danh mục `DM_QUYEN` |
 | GET/POST | `/api/permission-groups` | Danh sách / tạo nhóm quyền |
 | GET/PATCH/DELETE | `/api/permission-groups/:id` | Chi tiết / sửa / xoá |
-| GET/POST | `/api/categories` | Danh sách (`?search=&isActive=`) / tạo |
+| GET/POST | `/api/categories` | Danh sách (`?search=&status=&page=&pageSize=`) / tạo |
 | GET/PATCH/DELETE | `/api/categories/:id` | Chi tiết / sửa / xoá |
+| GET/POST | `/api/categories/:id/details` | Chi tiết của danh mục (`?search=&status=&groupDetailId=&page=&pageSize=`) / tạo |
+| GET/PATCH/DELETE | `/api/categories/:id/details/:detailId` | Một chi tiết / sửa / xoá |
 
 Mọi endpoint (trừ `/api/health`) cần header `x-api-key: <BACKEND_API_KEY>` — thiếu/không đúng → 401.
 Backend chỉ tin transport: việc kiểm tra *ai* là admin do Next.js làm (xem `frontend/src/lib/admin.ts`).
@@ -70,19 +77,56 @@ cả hai trường hợp đều ghi thêm một dòng vào `login_events`.
 ## Lược đồ
 
 ```sql
-users(id TEXT PK, email TEXT UNIQUE, name, image, provider,
+users(id INTEGER PK AUTOINCREMENT, accountId TEXT UNIQUE,
+      email TEXT UNIQUE, name, image, provider,
       createdAt, lastLoginAt, loginCount INTEGER)
 
-login_events(id TEXT PK, userId TEXT → users(id) ON DELETE CASCADE,
+login_events(id INTEGER PK AUTOINCREMENT,
+             userId INTEGER → users(id) ON DELETE CASCADE,
              provider, occurredAt)
 
 -- users có thêm: role TEXT (admin|user), status TEXT (active|blocked)
 -- hai cột này được thêm bằng ALTER TABLE nên DB cũ vẫn migrate được
+-- accountId giữ GUID cũ (trước đây chính là cột id)
 
-categories(id TEXT PK, name, slug TEXT UNIQUE, description,
-           sortOrder INTEGER, isActive INTEGER, createdAt, updatedAt)
+categories(id INTEGER PK AUTOINCREMENT, code TEXT UNIQUE, name, descriptions,
+           "order" INTEGER, status TEXT (active|inactive),
+           groupCategoryId → categories(id) NULL,
+           createdAt, updatedAt)
 
-permission_groups(id TEXT PK, name, slug TEXT UNIQUE, description,
+category_details(id INTEGER PK AUTOINCREMENT,
+                 categoryId → categories(id) ON DELETE CASCADE,
+                 code, name, descriptions, "order" INTEGER,
+                 status TEXT (active|inactive),
+                 groupDetailId → category_details(id) NULL,
+                 createdAt, updatedAt,
+                 UNIQUE(categoryId, code))
+
+-- Phân nhóm: danh mục có thể lấy danh mục khác làm nhóm (groupCategoryId).
+-- Khi đó mỗi chi tiết bắt buộc thuộc về một chi tiết của danh mục nhóm đó
+-- (groupDetailId). Ví dụ: "Phường/Xã" nhóm theo "Tỉnh", "Danh mục quyền"
+-- nhóm theo "Danh mục chức năng".
+-- Không xoá được danh mục/chi tiết đang được dùng làm nhóm (409).
+-- Đổi hoặc bỏ danh mục nhóm sẽ xoá groupDetailId của mọi chi tiết bên trong.
+-- Danh sách chi tiết của danh mục có nhóm được xếp theo nhóm trước, nên các
+-- chi tiết cùng nhóm luôn nằm liền khối khi phân trang.
+-- code của categories là duy nhất toàn bảng; code của category_details chỉ
+-- cần duy nhất trong phạm vi một danh mục
+--
+-- Danh mục quyền: category có code 'DM_QUYEN', nhóm theo
+-- 'DM_CHUC_NANG'. Mỗi chi tiết là một quyền của hệ thống (code chi tiết
+-- = mã quyền lưu trong permission_group_permissions), thuộc về một chức năng.
+-- Lúc khởi động, quyền mặc định nào còn thiếu thì được chèn thêm; admin thêm
+-- quyền mới bằng cách thêm chi tiết, tắt quyền thì nó không gán được nữa.
+-- Mã quyền cũ viết thường được migrate thành chữ hoa cho khớp với code.
+-- Mọi khoá chính/khoá ngoại đều là INTEGER tự tăng.
+-- DB cũ được migrate tự động lúc khởi động, qua hai bước:
+--   1) categories: slug/description/sortOrder/isActive -> code/descriptions/"order"/status
+--   2) toàn bộ khoá GUID (TEXT) -> INTEGER, GUID của users dời sang cột accountId
+-- Khoá ngoại được trỏ lại bằng bảng ánh xạ tạm nên quan hệ cha-con giữ nguyên.
+-- Regression test: src/database/sqlite.service.spec.ts
+
+permission_groups(id INTEGER PK AUTOINCREMENT, name, slug TEXT UNIQUE, description,
                   createdAt, updatedAt)
 
 permission_group_permissions(groupId → permission_groups(id) ON DELETE CASCADE,

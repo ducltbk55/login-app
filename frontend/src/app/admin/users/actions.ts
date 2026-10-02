@@ -44,7 +44,12 @@ export async function setUserGroupsAction(
   await requireAdmin();
 
   const email = String(formData.get("email") ?? "");
-  const groupIds = formData.getAll("groupIds").map(String);
+  // Checkbox luôn trả chuỗi; backend validate @IsInt nên phải ép về số.
+  const groupIds = formData.getAll("groupIds").map(Number);
+
+  if (groupIds.some((id) => !Number.isInteger(id))) {
+    return { error: "Danh sách nhóm quyền không hợp lệ." };
+  }
 
   try {
     await setUserGroups(email, groupIds);

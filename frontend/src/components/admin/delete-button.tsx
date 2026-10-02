@@ -1,6 +1,6 @@
 "use client";
 
-import { BUTTON } from "@/lib/styles";
+import { BUTTON, BUTTON_SM } from "@/lib/styles";
 
 /**
  * Nút xoá kèm xác nhận. Dùng form + server action nên vẫn chạy đúng luồng
@@ -11,11 +11,14 @@ export function DeleteButton({
   action,
   confirmText,
   label = "Xoá",
+  fields,
 }: {
-  id: string;
+  id: string | number;
   action: (formData: FormData) => Promise<void>;
   confirmText: string;
   label?: string;
+  /** Trường ẩn thêm, ví dụ `categoryId` cho chi tiết danh mục. */
+  fields?: Record<string, string | number>;
 }) {
   return (
     <form
@@ -25,7 +28,11 @@ export function DeleteButton({
       }}
     >
       <input type="hidden" name="id" value={id} />
-      <button type="submit" className={`${BUTTON.danger} px-3 py-1 text-xs`}>
+      {fields &&
+        Object.entries(fields).map(([name, value]) => (
+          <input key={name} type="hidden" name={name} value={value} />
+        ))}
+      <button type="submit" className={`${BUTTON.danger} ${BUTTON_SM}`}>
         {label}
       </button>
     </form>

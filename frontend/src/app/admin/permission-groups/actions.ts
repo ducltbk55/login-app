@@ -41,7 +41,7 @@ export async function createPermissionGroupAction(
 }
 
 export async function updatePermissionGroupAction(
-  id: string,
+  id: number,
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {

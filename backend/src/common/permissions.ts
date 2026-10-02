@@ -1,32 +1,92 @@
 /**
- * Danh mục quyền cố định của hệ thống. Permission group chỉ được chứa các key ở đây,
- * nhờ vậy không bao giờ có quyền "rác" trong DB và UI luôn render được nhãn tiếng Việt.
+ * Danh mục quyền của hệ thống được lưu trong DB dưới dạng hai danh mục lồng nhau:
+ *
+ *   "Danh mục chức năng" (DM_CHUC_NANG)
+ *     └─ chi tiết: Người dùng, Danh mục, Nhóm quyền ...
+ *   "Danh mục quyền"     (DM_QUYEN)  ──  lấy danh mục trên làm nhóm
+ *     └─ chi tiết: USERS.READ, USERS.WRITE ...  mỗi quyền thuộc một chức năng
+ *
+ * Nhờ vậy nhãn nhóm hiển thị trên form là tên tiếng Việt lấy từ dữ liệu, và
+ * admin thêm chức năng / quyền mới ngay trong màn Danh mục.
+ *
+ * Danh sách dưới đây chỉ là hạt giống: lúc khởi động, cái nào chưa có trong DB
+ * thì được chèn vào, còn những gì admin đã sửa thì giữ nguyên.
  */
-export const PERMISSIONS = [
-  { key: 'users.read', group: 'Người dùng', label: 'Xem danh sách người dùng' },
+export const FUNCTION_CATEGORY_CODE = 'DM_CHUC_NANG';
+export const FUNCTION_CATEGORY_NAME = 'Danh mục chức năng';
+export const FUNCTION_CATEGORY_DESCRIPTION =
+  'Các mảng chức năng của hệ thống, dùng để phân nhóm quyền.';
+
+export const PERMISSION_CATEGORY_CODE = 'DM_QUYEN';
+export const PERMISSION_CATEGORY_NAME = 'Danh mục quyền';
+export const PERMISSION_CATEGORY_DESCRIPTION =
+  'Mỗi chi tiết là một quyền của hệ thống. Mã chi tiết chính là mã quyền ' +
+  'được gán cho nhóm quyền.';
+
+export type FunctionSeed = { code: string; label: string };
+
+export const FUNCTION_SEEDS: FunctionSeed[] = [
+  { code: 'USERS', label: 'Người dùng' },
+  { code: 'CATEGORIES', label: 'Danh mục' },
+  { code: 'PERMISSION-GROUPS', label: 'Nhóm quyền' },
+];
+
+export type PermissionSeed = {
+  /** Mã quyền, cũng là `code` của chi tiết danh mục quyền. */
+  code: string;
+  /** Nhãn tiếng Việt, lưu vào `name` của chi tiết. */
+  label: string;
+  /** Mã chức năng mà quyền này thuộc về. */
+  functionCode: string;
+};
+
+export const PERMISSION_SEEDS: PermissionSeed[] = [
   {
-    key: 'users.write',
-    group: 'Người dùng',
+    code: 'USERS.READ',
+    label: 'Xem danh sách người dùng',
+    functionCode: 'USERS',
+  },
+  {
+    code: 'USERS.WRITE',
     label: 'Sửa vai trò / trạng thái',
+    functionCode: 'USERS',
   },
-  { key: 'categories.read', group: 'Danh mục', label: 'Xem danh mục' },
   {
-    key: 'categories.write',
-    group: 'Danh mục',
+    code: 'CATEGORIES.READ',
+    label: 'Xem danh mục',
+    functionCode: 'CATEGORIES',
+  },
+  {
+    code: 'CATEGORIES.WRITE',
     label: 'Thêm / sửa / xoá danh mục',
+    functionCode: 'CATEGORIES',
   },
   {
-    key: 'permission-groups.read',
-    group: 'Nhóm quyền',
+    code: 'PERMISSION-GROUPS.READ',
     label: 'Xem nhóm quyền',
+    functionCode: 'PERMISSION-GROUPS',
   },
   {
-    key: 'permission-groups.write',
-    group: 'Nhóm quyền',
+    code: 'PERMISSION-GROUPS.WRITE',
     label: 'Thêm / sửa / xoá nhóm quyền',
+    functionCode: 'PERMISSION-GROUPS',
   },
-] as const;
+];
 
-export type Permission = (typeof PERMISSIONS)[number]['key'];
+/** Một quyền đọc ra từ DB, dạng mà trang admin dùng để render checkbox. */
+export type PermissionDef = {
+  key: string;
+  /** Tên chức năng (chi tiết của danh mục chức năng) dùng làm tiêu đề nhóm. */
+  group: string;
+  label: string;
+  description: string | null;
+};
 
-export const PERMISSION_KEYS: string[] = PERMISSIONS.map((p) => p.key);
+/**
+ * Nhãn nhóm dự phòng cho quyền chưa được phân nhóm: `USERS.READ` -> `USERS`.
+ * Dữ liệu seed luôn có nhóm, nhưng chi tiết cũ thì có thể chưa.
+ */
+export function permissionGroupOf(code: string): string {
+  const dot = code.indexOf('.');
+  return dot > 0 ? code.slice(0, dot) : code;
+}

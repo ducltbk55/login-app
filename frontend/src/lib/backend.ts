@@ -85,6 +85,6 @@ export async function requestOptional<T>(
 }
 
 /** Đường dẫn an toàn cho email/id nằm trong URL. */
-export function segment(value: string): string {
-  return encodeURIComponent(value);
+export function segment(value: string | number): string {
+  return encodeURIComponent(String(value));
 }

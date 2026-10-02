@@ -2,9 +2,10 @@
 
 import { useActionState } from "react";
 
+import { SearchableSelect } from "@/components/admin/searchable-select";
 import { SubmitButton } from "@/components/submit-button";
 import type { PermissionGroup } from "@/lib/permission-groups";
-import { INPUT, LABEL_TEXT } from "@/lib/styles";
+import { CHECKBOX, LABEL_TEXT } from "@/lib/styles";
 import type { StoredUserDetail } from "@/lib/users";
 
 type ActionState = { error?: string; success?: string } | null;
@@ -16,10 +17,10 @@ function Notice({ state }: { state: ActionState }) {
   return (
     <p
       role="status"
-      className={`rounded-lg px-3 py-2 text-sm ${
+      className={`rounded-lg border px-3 py-2 text-sm ${
         state.error
-          ? "bg-red-500/10 text-red-600 dark:text-red-400"
-          : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+          : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
       }`}
     >
       {state.error ?? state.success}
@@ -40,30 +41,38 @@ export function RoleStatusForm({
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="email" value={user.email} />
 
-      <div className="flex flex-wrap gap-3">
-        <label className="text-sm">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="text-sm">
           <span className={`mb-1.5 block ${LABEL_TEXT}`}>Vai trò</span>
-          <select name="role" defaultValue={user.role} className={INPUT}>
-            <option value="user">user</option>
-            <option value="admin">admin</option>
-          </select>
-        </label>
-        <label className="text-sm">
+          <SearchableSelect
+            name="role"
+            defaultValue={user.role}
+            options={[
+              { value: "user", label: "user" },
+              { value: "admin", label: "admin" },
+            ]}
+          />
+        </div>
+        <div className="text-sm">
           <span className={`mb-1.5 block ${LABEL_TEXT}`}>Trạng thái</span>
-          <select name="status" defaultValue={user.status} className={INPUT}>
-            <option value="active">active</option>
-            <option value="blocked">blocked</option>
-          </select>
-        </label>
+          <SearchableSelect
+            name="status"
+            defaultValue={user.status}
+            options={[
+              { value: "active", label: "active" },
+              { value: "blocked", label: "blocked" },
+            ]}
+          />
+        </div>
       </div>
 
-      <p className="text-xs opacity-60">
+      <p className="rounded-lg bg-admin-surface-2 px-3 py-2 text-xs text-admin-muted">
         Khoá tài khoản chặn được lần đăng nhập kế tiếp; phiên hiện tại của họ vẫn
         còn hiệu lực tới khi hết hạn.
       </p>
 
       <Notice state={state} />
-      <SubmitButton>Lưu thay đổi</SubmitButton>
+      <SubmitButton className="w-full sm:w-auto">Lưu thay đổi</SubmitButton>
     </form>
   );
 }
@@ -85,24 +94,25 @@ export function UserGroupsForm({
       <input type="hidden" name="email" value={user.email} />
 
       {groups.length === 0 ? (
-        <p className="text-sm opacity-60">
+        <p className="text-sm text-admin-muted">
           Chưa có nhóm quyền nào — hãy tạo ở mục Nhóm quyền.
         </p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-1.5">
           {groups.map((group) => (
             <li key={group.id}>
-              <label className="flex items-start gap-3 text-sm">
+              {/* Vùng bấm rộng cả ô: dễ chạm trên mobile */}
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-transparent p-2.5 text-sm transition hover:border-admin-border hover:bg-brand-500/5">
                 <input
                   type="checkbox"
                   name="groupIds"
                   value={group.id}
                   defaultChecked={assigned.has(group.id)}
-                  className="mt-1 size-4 accent-blue-600"
+                  className={`${CHECKBOX} mt-0.5`}
                 />
-                <span>
-                  <span className="font-medium">{group.name}</span>
-                  <span className="block text-xs opacity-60">
+                <span className="min-w-0">
+                  <span className="block font-medium">{group.name}</span>
+                  <span className="block text-xs text-admin-muted">
                     {group.permissions.length} quyền · {group.slug}
                   </span>
                 </span>
@@ -113,7 +123,7 @@ export function UserGroupsForm({
       )}
 
       <Notice state={state} />
-      <SubmitButton>Lưu nhóm quyền</SubmitButton>
+      <SubmitButton className="w-full sm:w-auto">Lưu nhóm quyền</SubmitButton>
     </form>
   );
 }

@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -12,8 +13,9 @@ import {
 } from '@nestjs/common';
 
 import { ApiKeyGuard } from '../common/api-key.guard';
-import type { Category } from './category.entity';
+import { paginate, type Paginated } from '../common/pagination';
 import { CategoriesService } from './categories.service';
+import type { Category, CategorySummary } from './category.entity';
 import { ListCategoriesDto } from './dto/list-categories.dto';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/save-category.dto';
 
@@ -23,16 +25,12 @@ export class CategoriesController {
   constructor(private readonly categories: CategoriesService) {}
 
   @Get()
-  list(@Query() query: ListCategoriesDto): {
-    total: number;
-    items: Category[];
-  } {
-    const items = this.categories.list(query);
-    return { total: items.length, items };
+  list(@Query() query: ListCategoriesDto): Paginated<CategorySummary> {
+    return paginate(this.categories.list(query), query);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string): Category {
+  findOne(@Param('id', ParseIntPipe) id: number): Category {
     return this.categories.findOneOrFail(id);
   }
 
@@ -42,13 +40,16 @@ export class CategoriesController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateCategoryDto): Category {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCategoryDto,
+  ): Category {
     return this.categories.update(id, dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id') id: string): void {
+  remove(@Param('id', ParseIntPipe) id: number): void {
     this.categories.remove(id);
   }
 }

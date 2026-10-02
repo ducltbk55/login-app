@@ -6,9 +6,9 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
-import { PERMISSION_KEYS } from '../common/permissions';
 import { matchesSearch } from '../common/search';
 import { SqliteService } from '../database/sqlite.service';
+import { PermissionCatalogService } from '../permission-groups/permission-catalog.service';
 import { PermissionGroupsService } from '../permission-groups/permission-groups.service';
 import { AssignGroupsDto } from './dto/assign-groups.dto';
 import { ListUsersDto } from './dto/list-users.dto';
@@ -26,9 +26,9 @@ import {
 export const DEFAULT_LOGIN_HISTORY_LIMIT = 20;
 const MAX_LOGIN_HISTORY_LIMIT = 100;
 
-/** SQLite không có kiểu boolean/number rõ ràng nên chuẩn hoá lại khi đọc ra. */
+/** node:sqlite trả cột INTEGER có thể là bigint, nên ép về number khi đọc ra. */
 function toUser(row: User): User {
-  return { ...row, loginCount: Number(row.loginCount) };
+  return { ...row, id: Number(row.id), loginCount: Number(row.loginCount) };
 }
 
 @Injectable()
@@ -38,6 +38,7 @@ export class UsersService {
   constructor(
     private readonly sqlite: SqliteService,
     private readonly groups: PermissionGroupsService,
+    private readonly catalog: PermissionCatalogService,
   ) {}
 
   /**
@@ -61,10 +62,10 @@ export class UsersService {
 
       this.sqlite.db
         .prepare(
-          `INSERT INTO login_events (id, userId, provider, occurredAt)
-           VALUES (?, ?, ?, ?)`,
+          `INSERT INTO login_events (userId, provider, occurredAt)
+           VALUES (?, ?, ?)`,
         )
-        .run(randomUUID(), user.id, dto.provider, now);
+        .run(user.id, dto.provider, now);
 
       return { user, isNewUser: !existing };
     });
@@ -211,7 +212,7 @@ export class UsersService {
     limit = DEFAULT_LOGIN_HISTORY_LIMIT,
   ): LoginEvent[] {
     const user = this.findByEmailOrFail(email);
-    return this.sqlite.db
+    const rows = this.sqlite.db
       .prepare(
         `SELECT * FROM login_events
           WHERE userId = ?
@@ -219,6 +220,12 @@ export class UsersService {
           LIMIT ?`,
       )
       .all(user.id, clampLimit(limit)) as LoginEvent[];
+
+    return rows.map((row) => ({
+      ...row,
+      id: Number(row.id),
+      userId: Number(row.userId),
+    }));
   }
 
   private countActiveAdmins(): number {
@@ -231,8 +238,8 @@ export class UsersService {
     return Number(row?.total ?? 0);
   }
 
-  private findGroups(userId: string): UserGroupRef[] {
-    return this.sqlite.db
+  private findGroups(userId: number): UserGroupRef[] {
+    const rows = this.sqlite.db
       .prepare(
         `SELECT g.id, g.name, g.slug
            FROM user_permission_groups ug
@@ -241,11 +248,13 @@ export class UsersService {
           ORDER BY g.name COLLATE NOCASE`,
       )
       .all(userId) as UserGroupRef[];
+
+    return rows.map((row) => ({ ...row, id: Number(row.id) }));
   }
 
   /** Role admin được coi là có toàn bộ quyền, khỏi phải tự gán nhóm cho mình. */
   private effectivePermissions(user: User, groups: UserGroupRef[]): string[] {
-    if (user.role === 'admin') return [...PERMISSION_KEYS];
+    if (user.role === 'admin') return this.catalog.keys();
     if (groups.length === 0) return [];
 
     const rows = this.sqlite.db
@@ -260,10 +269,10 @@ export class UsersService {
     return rows.map((r) => r.permission);
   }
 
-  /** Tài khoản mới: INSERT bản ghi đầu tiên. */
+  /** Tài khoản mới: INSERT bản ghi đầu tiên; `id` do SQLite tự cấp. */
   private insertUser(dto: SyncUserDto, now: string): User {
-    const user: User = {
-      id: randomUUID(),
+    const user: Omit<User, 'id'> = {
+      accountId: randomUUID(),
       email: dto.email,
       name: dto.name ?? null,
       image: dto.image ?? null,
@@ -275,15 +284,15 @@ export class UsersService {
       loginCount: 1,
     };
 
-    this.sqlite.db
+    const result = this.sqlite.db
       .prepare(
         `INSERT INTO users
-           (id, email, name, image, provider, role, status,
+           (accountId, email, name, image, provider, role, status,
             createdAt, lastLoginAt, loginCount)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
-        user.id,
+        user.accountId,
         user.email,
         user.name,
         user.image,
@@ -295,7 +304,7 @@ export class UsersService {
         user.loginCount,
       );
 
-    return user;
+    return { ...user, id: Number(result.lastInsertRowid) };
   }
 
   /** Tài khoản đã có: cập nhật tên/ảnh mới nhất từ Google và tăng loginCount. */

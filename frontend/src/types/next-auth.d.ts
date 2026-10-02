@@ -9,6 +9,8 @@ import type { UserRole } from "@/lib/users";
  * hiện/ẩn link, còn cổng vào /admin luôn kiểm tra lại DB — xem `lib/admin.ts`.
  */
 interface BackendClaims {
+  /** GUID tài khoản (cột `users.accountId`), ổn định qua các lần migrate. */
+  accountId?: string;
   provider?: string;
   role?: UserRole;
   createdAt?: string;
@@ -24,13 +26,14 @@ declare module "next-auth" {
 
 declare module "next-auth/jwt" {
   interface JWT extends BackendClaims {
-    userId?: string;
+    /** Khoá chính số của bảng users. */
+    userId?: number;
   }
 }
 
 // next-auth v5 tái xuất kiểu JWT từ @auth/core, cần augment cả module này.
 declare module "@auth/core/jwt" {
   interface JWT extends BackendClaims {
-    userId?: string;
+    userId?: number;
   }
 }

@@ -1,8 +1,15 @@
 import Link from "next/link";
 
+import { ChevronRightIcon } from "@/components/admin/icons";
+import {
+  Field,
+  FilterBar,
+  PageHeader,
+} from "@/components/admin/page-header";
+import { SearchableSelect } from "@/components/admin/searchable-select";
 import { Badge } from "@/components/badge";
 import { formatDateTime } from "@/lib/format";
-import { BUTTON, INPUT, TABLE } from "@/lib/styles";
+import { BUTTON, INPUT, ROW_CARD, TABLE } from "@/lib/styles";
 import { listUsers, type UserRole, type UserStatus } from "@/lib/users";
 
 function pickOne(value: string | string[] | undefined): string | undefined {
@@ -21,61 +28,115 @@ export default async function AdminUsersPage(
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">Người dùng</h2>
-          <p className="text-sm opacity-60">
-            Tài khoản được tạo tự động khi đăng nhập Google, nên ở đây chỉ xem và
-            phân quyền.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Người dùng"
+        description="Tài khoản được tạo tự động khi đăng nhập Google, nên ở đây chỉ xem và phân quyền."
+      />
 
       {/* GET form: bộ lọc nằm trên URL nên chia sẻ/bookmark được */}
-      <form className="flex flex-wrap items-end gap-3">
-        <label className="text-sm">
-          <span className="mb-1.5 block font-medium opacity-70">Tìm kiếm</span>
+      <FilterBar>
+        <Field label="Tìm kiếm" className="sm:flex-1 sm:min-w-56">
           <input
             type="search"
             name="search"
             defaultValue={search}
             placeholder="Tên hoặc email (bỏ dấu cũng được)"
-            className={`${INPUT} sm:w-72`}
+            className={INPUT}
           />
-        </label>
-        <label className="text-sm">
-          <span className="mb-1.5 block font-medium opacity-70">Vai trò</span>
-          <select name="role" defaultValue={role ?? ""} className={INPUT}>
-            <option value="">Tất cả</option>
-            <option value="admin">admin</option>
-            <option value="user">user</option>
-          </select>
-        </label>
-        <label className="text-sm">
-          <span className="mb-1.5 block font-medium opacity-70">
-            Trạng thái
-          </span>
-          <select name="status" defaultValue={status ?? ""} className={INPUT}>
-            <option value="">Tất cả</option>
-            <option value="active">active</option>
-            <option value="blocked">blocked</option>
-          </select>
-        </label>
-        <button type="submit" className={BUTTON.secondary}>
-          Lọc
-        </button>
-        {(search || role || status) && (
-          <Link href="/admin/users" className={BUTTON.secondary}>
-            Xoá lọc
-          </Link>
+        </Field>
+        <Field label="Vai trò" className="sm:w-40">
+          <SearchableSelect
+            name="role"
+            defaultValue={role ?? ""}
+            options={[
+              { value: "", label: "Tất cả" },
+              { value: "admin", label: "admin" },
+              { value: "user", label: "user" },
+            ]}
+          />
+        </Field>
+        <Field label="Trạng thái" className="sm:w-40">
+          <SearchableSelect
+            name="status"
+            defaultValue={status ?? ""}
+            options={[
+              { value: "", label: "Tất cả" },
+              { value: "active", label: "active" },
+              { value: "blocked", label: "blocked" },
+            ]}
+          />
+        </Field>
+        <div className="flex gap-2">
+          <button type="submit" className={`${BUTTON.primary} flex-1 sm:flex-none`}>
+            Lọc
+          </button>
+          {(search || role || status) && (
+            <Link
+              href="/admin/users"
+              className={`${BUTTON.secondary} flex-1 sm:flex-none`}
+            >
+              Xoá lọc
+            </Link>
+          )}
+        </div>
+      </FilterBar>
+
+      <p className="text-sm text-admin-muted">
+        <span className="font-semibold text-admin-text">{users.length}</span> bản
+        ghi
+      </p>
+
+      {/* Mobile: mỗi người dùng là một thẻ bấm được, không phải cuộn ngang */}
+      <ul className="grid gap-3 md:hidden">
+        {users.map((user) => (
+          <li key={user.id}>
+            <Link href={`/admin/users/${encodeURIComponent(user.email)}`} className={`${ROW_CARD} block`}>
+              <div className="flex items-start gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-500/12 text-sm font-semibold text-brand-700 dark:text-brand-300">
+                  {(user.name ?? user.email).charAt(0).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{user.name ?? "—"}</p>
+                  <p className="truncate text-xs text-admin-muted">
+                    {user.email}
+                  </p>
+                </div>
+                <ChevronRightIcon className="size-4 shrink-0 text-admin-muted" />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Badge tone={user.role === "admin" ? "brand" : "neutral"}>
+                  {user.role}
+                </Badge>
+                <Badge tone={user.status === "active" ? "success" : "danger"}>
+                  {user.status}
+                </Badge>
+              </div>
+
+              <dl className="grid grid-cols-2 gap-2 border-t border-admin-border/60 pt-3 text-xs">
+                <div>
+                  <dt className="text-admin-muted">Lần cuối</dt>
+                  <dd className="mt-0.5">{formatDateTime(user.lastLoginAt)}</dd>
+                </div>
+                <div>
+                  <dt className="text-admin-muted">Số lần</dt>
+                  <dd className="mt-0.5 tabular-nums">{user.loginCount}</dd>
+                </div>
+              </dl>
+            </Link>
+          </li>
+        ))}
+        {users.length === 0 && (
+          <li className={`${ROW_CARD} text-center text-sm text-admin-muted`}>
+            Không có người dùng nào khớp bộ lọc.
+          </li>
         )}
-      </form>
+      </ul>
 
-      <p className="text-sm opacity-60">{users.length} bản ghi</p>
-
-      <div className={TABLE.wrapper}>
+      {/* Từ md trở lên mới đủ chỗ cho bảng */}
+      <div className={`${TABLE.wrapper} hidden md:block`}>
         <table className={TABLE.table}>
-          <thead>
+          <thead className={TABLE.thead}>
             <tr>
               <th className={TABLE.th}>Người dùng</th>
               <th className={TABLE.th}>Vai trò</th>
@@ -87,17 +148,24 @@ export default async function AdminUsersPage(
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id}>
+              <tr key={user.id} className={TABLE.tr}>
                 <td className={TABLE.td}>
-                  <span className="block font-medium">
-                    {user.name ?? "—"}
-                  </span>
-                  <span className="block text-xs opacity-60">
-                    {user.email}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-500/12 text-xs font-semibold text-brand-700 dark:text-brand-300">
+                      {(user.name ?? user.email).charAt(0).toUpperCase()}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block font-medium">
+                        {user.name ?? "—"}
+                      </span>
+                      <span className="block text-xs text-admin-muted">
+                        {user.email}
+                      </span>
+                    </span>
+                  </div>
                 </td>
                 <td className={TABLE.td}>
-                  <Badge tone={user.role === "admin" ? "info" : "neutral"}>
+                  <Badge tone={user.role === "admin" ? "brand" : "neutral"}>
                     {user.role}
                   </Badge>
                 </td>
@@ -108,18 +176,19 @@ export default async function AdminUsersPage(
                     {user.status}
                   </Badge>
                 </td>
-                <td className={TABLE.td}>
+                <td className={`${TABLE.td} text-admin-muted`}>
                   {formatDateTime(user.lastLoginAt)}
                 </td>
                 <td className={`${TABLE.td} tabular-nums`}>
                   {user.loginCount}
                 </td>
-                <td className={TABLE.td}>
+                <td className={`${TABLE.td} text-right`}>
                   <Link
                     href={`/admin/users/${encodeURIComponent(user.email)}`}
-                    className="text-sm underline underline-offset-4 opacity-70 hover:opacity-100"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-brand-700 transition hover:text-brand-800 dark:text-brand-300"
                   >
                     Chi tiết
+                    <ChevronRightIcon className="size-4" />
                   </Link>
                 </td>
               </tr>
