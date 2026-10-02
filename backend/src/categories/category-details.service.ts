@@ -240,6 +240,25 @@ export class CategoryDetailsService {
       );
     }
 
+    // Chuyên mục bài viết cũng là chi tiết danh mục. Bảng `articles` có khoá
+    // ngoại trỏ tới đây, nên không chặn trước thì SQLite ném "FOREIGN KEY
+    // constraint failed" — đúng nhưng người dùng không hiểu gì. Truy vấn
+    // thẳng bảng thay vì gọi ArticlesService để khỏi tạo vòng phụ thuộc
+    // module; vẫn chung một kết nối nên vẫn nằm trong transaction.
+    const articles = this.sqlite.db
+      .prepare(
+        'SELECT COUNT(*) AS total FROM articles WHERE categoryDetailId = ?',
+      )
+      .get(id) as { total: number | bigint } | undefined;
+
+    const articleCount = Number(articles?.total ?? 0);
+    if (articleCount > 0) {
+      throw new ConflictException(
+        `Chuyên mục này đang có ${articleCount} bài viết. ` +
+          'Hãy chuyển các bài sang chuyên mục khác hoặc xoá chúng trước.',
+      );
+    }
+
     this.sqlite.db
       .prepare('DELETE FROM category_details WHERE id = ? AND categoryId = ?')
       .run(id, categoryId);

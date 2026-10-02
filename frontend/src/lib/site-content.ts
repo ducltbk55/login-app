@@ -60,55 +60,7 @@ export const SERVICES: Service[] = [
   },
 ];
 
-export type NewsPost = {
-  slug: string;
-  title: string;
-  excerpt: string;
-  /** ISO date; hiển thị qua `formatDate` để tránh lệch múi giờ. */
-  publishedAt: string;
-  category: string;
-  readingMinutes: number;
-};
-
-/** Dữ liệu mẫu — thay bằng truy vấn CSDL khi có phân hệ tin tức. */
-export const NEWS: NewsPost[] = [
-  {
-    slug: "uy-vu-ict-4-nam-dong-hanh",
-    title: "UY VŨ ICT: bốn năm đồng hành cùng doanh nghiệp miền Trung",
-    excerpt:
-      "Từ một nhóm kỹ sư nhỏ năm 2022, công ty đã triển khai hàng chục hệ thống quản trị cho khách hàng tại Đà Nẵng và các tỉnh lân cận.",
-    publishedAt: "2026-09-18",
-    category: "Hoạt động công ty",
-    readingMinutes: 4,
-  },
-  {
-    slug: "chuyen-doi-so-doanh-nghiep-vua-va-nho",
-    title: "Chuyển đổi số cho doanh nghiệp vừa và nhỏ: bắt đầu từ đâu?",
-    excerpt:
-      "Không cần đầu tư lớn ngay từ đầu. Bài viết phân tích ba bước đi thực tế giúp doanh nghiệp nhỏ số hoá mà vẫn kiểm soát được chi phí.",
-    publishedAt: "2026-08-05",
-    category: "Góc chuyên môn",
-    readingMinutes: 7,
-  },
-  {
-    slug: "ra-mat-he-thong-quan-tri-danh-muc",
-    title: "Ra mắt hệ thống quản trị danh mục dùng chung",
-    excerpt:
-      "Giải pháp cho phép doanh nghiệp tự định nghĩa danh mục phân cấp — từ danh mục quyền tới danh mục địa giới hành chính — mà không cần lập trình.",
-    publishedAt: "2026-07-22",
-    category: "Sản phẩm",
-    readingMinutes: 5,
-  },
-  {
-    slug: "cap-nhat-don-vi-hanh-chinh-2025",
-    title: "Cập nhật dữ liệu đơn vị hành chính sau sắp xếp",
-    excerpt:
-      "Các hệ thống do UY VŨ ICT triển khai đã đồng bộ 34 tỉnh/thành và 3.321 phường/xã theo cơ cấu hành chính mới.",
-    publishedAt: "2026-07-01",
-    category: "Sản phẩm",
-    readingMinutes: 3,
-  },
-];
+/* Tin bài giờ nằm trong DB — xem lib/articles.ts và bảng `articles`. */
 
 export type JobOpening = {
   slug: string;

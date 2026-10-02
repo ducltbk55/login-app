@@ -6,6 +6,8 @@ import type { ComponentType, SVGProps } from "react";
 
 import {
   DashboardIcon,
+  MailIcon,
+  NewspaperIcon,
   ShieldIcon,
   TagIcon,
   UsersIcon,
@@ -21,7 +23,9 @@ type NavItem = {
 const ITEMS: NavItem[] = [
   { href: "/admin", label: "Tổng quan", icon: DashboardIcon, exact: true },
   { href: "/admin/users", label: "Người dùng", icon: UsersIcon },
+  { href: "/admin/articles", label: "Bài viết", icon: NewspaperIcon },
   { href: "/admin/categories", label: "Danh mục", icon: TagIcon },
+  { href: "/admin/contacts", label: "Liên hệ", icon: MailIcon },
   { href: "/admin/permission-groups", label: "Nhóm quyền", icon: ShieldIcon },
 ];
 

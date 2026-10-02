@@ -29,6 +29,8 @@ export const FUNCTION_SEEDS: FunctionSeed[] = [
   { code: 'USERS', label: 'Người dùng' },
   { code: 'CATEGORIES', label: 'Danh mục' },
   { code: 'PERMISSION-GROUPS', label: 'Nhóm quyền' },
+  { code: 'ARTICLES', label: 'Bài viết' },
+  { code: 'CONTACTS', label: 'Liên hệ' },
 ];
 
 export type PermissionSeed = {
@@ -70,6 +72,31 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
     code: 'PERMISSION-GROUPS.WRITE',
     label: 'Thêm / sửa / xoá nhóm quyền',
     functionCode: 'PERMISSION-GROUPS',
+  },
+  {
+    code: 'ARTICLES.READ',
+    label: 'Xem bài viết',
+    functionCode: 'ARTICLES',
+  },
+  {
+    code: 'ARTICLES.WRITE',
+    label: 'Thêm / sửa / xoá bài viết',
+    functionCode: 'ARTICLES',
+  },
+  {
+    code: 'ARTICLES.PUBLISH',
+    label: 'Xuất bản / gỡ bài viết',
+    functionCode: 'ARTICLES',
+  },
+  {
+    code: 'CONTACTS.READ',
+    label: 'Xem yêu cầu liên hệ',
+    functionCode: 'CONTACTS',
+  },
+  {
+    code: 'CONTACTS.WRITE',
+    label: 'Đổi trạng thái / xoá liên hệ',
+    functionCode: 'CONTACTS',
   },
 ];
 

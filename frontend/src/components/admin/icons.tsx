@@ -225,3 +225,30 @@ export function UserPlusIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function NewspaperIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 5.5h12.5v13H5.5a1.5 1.5 0 0 1-1.5-1.5V5.5Z" />
+      <path d="M16.5 9H19a1 1 0 0 1 1 1v7a1.5 1.5 0 0 1-3 0V9Z" />
+      <path d="M7 9h6.5M7 12.5h6.5M7 16h4" />
+    </Icon>
+  );
+}
+
+export function MailIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="m3.5 7 7.4 5.3a2 2 0 0 0 2.2 0L20.5 7" />
+    </Icon>
+  );
+}
+
+export function PaperclipIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M20 11.5 12 19.5a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10.2 17.3a2 2 0 0 1-2.8-2.8l7.8-7.8" />
+    </Icon>
+  );
+}

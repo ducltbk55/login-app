@@ -11,23 +11,25 @@ import {
   COMPANY_TAGLINE,
   yearsInBusiness,
 } from "@/lib/company";
-import { formatDate } from "@/lib/format";
-import { JOBS, NEWS, SERVICES } from "@/lib/site-content";
+import { ArticleCard } from "@/components/site/article-card";
+import { listArticles } from "@/lib/articles";
+import { JOBS, SERVICES } from "@/lib/site-content";
 
 export const metadata = {
   title: "Trang chủ",
   description: `${COMPANY_NAME} — ${COMPANY_TAGLINE}.`,
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Ba bài mới nhất đang lên sóng; trang vẫn dựng được nếu chưa có bài nào.
+  const latestNews = (await listArticles({ live: true, pageSize: 3 })).items;
+
   const stats = [
     { value: `${COMPANY_PROFILE.foundedYear}`, label: "Năm thành lập" },
     { value: `${yearsInBusiness()}+`, label: "Năm kinh nghiệm" },
     { value: `${SERVICES.length}`, label: "Nhóm dịch vụ" },
     { value: `${JOBS.reduce((n, j) => n + j.openings, 0)}`, label: "Vị trí đang tuyển" },
   ];
-
-  const latestNews = NEWS.slice(0, 3);
 
   return (
     <>
@@ -166,32 +168,17 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {latestNews.map((post) => (
-              <article
-                key={post.slug}
-                className="flex flex-col rounded-2xl border border-black/10 bg-white p-6"
-              >
-                <div className="flex items-center gap-2 text-xs text-black/50">
-                  <span className="rounded-full bg-gold-100 px-2.5 py-0.5 font-medium text-gold-800">
-                    {post.category}
-                  </span>
-                  <time dateTime={post.publishedAt}>
-                    {formatDate(post.publishedAt)}
-                  </time>
-                </div>
-                <h3 className="mt-3 text-lg font-semibold text-balance">
-                  {post.title}
-                </h3>
-                <p className="mt-2 flex-1 text-sm text-black/60">
-                  {post.excerpt}
-                </p>
-                <p className="mt-4 text-xs text-black/40">
-                  {post.readingMinutes} phút đọc
-                </p>
-              </article>
-            ))}
-          </div>
+          {latestNews.length > 0 ? (
+            <div className="mt-10 grid gap-6 lg:grid-cols-3">
+              {latestNews.map((article) => (
+                <ArticleCard key={article.id} article={article} />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-10 rounded-2xl border border-dashed border-black/15 px-6 py-12 text-center text-sm text-black/50">
+              Chưa có bài viết nào được đăng.
+            </p>
+          )}
         </div>
       </section>
 

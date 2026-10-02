@@ -47,7 +47,11 @@ export async function request<T>(
     response = await fetch(`${BACKEND_URL}${path}`, {
       ...init,
       headers: {
-        "content-type": "application/json",
+        // FormData tự đặt content-type kèm boundary — ép JSON vào đây là
+        // backend không tách nổi các phần của multipart.
+        ...(init.body instanceof FormData
+          ? {}
+          : { "content-type": "application/json" }),
         "x-api-key": apiKey,
         ...init.headers,
       },
@@ -87,4 +91,38 @@ export async function requestOptional<T>(
 /** Đường dẫn an toàn cho email/id nằm trong URL. */
 export function segment(value: string | number): string {
   return encodeURIComponent(String(value));
+}
+
+/**
+ * Gọi backend và trả về `Response` thô, không đọc body.
+ *
+ * Dùng cho tệp nhị phân (đính kèm liên hệ): route handler của Next chuyển
+ * tiếp thẳng luồng dữ liệu cho trình duyệt thay vì nạp hết vào bộ nhớ.
+ */
+export async function requestStream(path: string): Promise<Response> {
+  const apiKey = process.env.BACKEND_API_KEY;
+  if (!apiKey) {
+    throw new BackendError(
+      "Thiếu BACKEND_API_KEY trong .env.local của frontend",
+    );
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_URL}${path}`, {
+      headers: { "x-api-key": apiKey },
+      cache: "no-store",
+    });
+  } catch (cause) {
+    throw new BackendError(
+      `Không kết nối được backend tại ${BACKEND_URL}.`,
+      undefined,
+      { cause },
+    );
+  }
+
+  if (!response.ok) {
+    throw new BackendError(await readErrorMessage(response), response.status);
+  }
+  return response;
 }

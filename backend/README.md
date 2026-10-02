@@ -20,6 +20,11 @@ native module (`sqlite3`, `better-sqlite3`) hay chạy migration tool nào.
 | `src/health/health.controller.ts` | `/api/health` (không cần api key) |
 | `src/dev-login/` | Mạo danh người dùng theo id, khoá sau cờ `DEV_LOGIN` |
 | `src/categories/` | CRUD danh mục + chi tiết danh mục (code tự sinh từ tên) |
+| `src/articles/` | CRUD bài viết; chuyên mục lấy từ danh mục `DM_CHUYEN_MUC` |
+| `src/contacts/` | Yêu cầu liên hệ từ trang ngoài + tệp đính kèm |
+| `src/contacts/attachments.ts` | Allowlist định dạng, sinh tên lưu trữ, chặn path traversal |
+| `src/common/article-categories.ts` | Hạt giống danh mục chuyên mục |
+| `src/common/validation.ts` | Cấu hình ValidationPipe dùng chung cho app và e2e |
 | `src/permission-groups/` | CRUD nhóm quyền + seed nhóm `administrators` |
 | `src/common/permissions.ts` | Hạt giống danh mục quyền + suy ra nhóm hiển thị |
 | `src/permission-groups/permission-catalog.service.ts` | Danh mục quyền đọc từ DB (chi tiết của danh mục `DM_QUYEN`) |
@@ -71,6 +76,20 @@ npm run build && npm run start:prod
 | GET/PATCH/DELETE | `/api/categories/:id` | Chi tiết / sửa / xoá |
 | GET/POST | `/api/categories/:id/details` | Chi tiết của danh mục (`?search=&status=&groupDetailId=&page=&pageSize=`) / tạo |
 | GET/PATCH/DELETE | `/api/categories/:id/details/:detailId` | Một chi tiết / sửa / xoá |
+| GET | `/api/articles` | `?search=&status=&categoryDetailId=&live=&featured=&page=&pageSize=` |
+| GET | `/api/articles/categories` | Chuyên mục đang bật, kèm số bài (`?live=true`) |
+| GET | `/api/articles/counts` | Số bài theo từng chuyên mục |
+| GET | `/api/articles/slug/:slug` | Một bài theo đường dẫn, cho trang ngoài |
+| POST | `/api/articles/slug/:slug/views` | Tăng lượt xem (204) |
+| GET/POST | `/api/articles` | Chi tiết theo id / tạo bài |
+| GET/PATCH/DELETE | `/api/articles/:id` | Một bài / sửa / xoá |
+| GET | `/api/contacts` | `?search=&status=&page=&pageSize=` |
+| GET | `/api/contacts/stats` | `{ total, pending, inProgress, resolved }` |
+| POST | `/api/contacts` | **multipart**: form liên hệ + `attachment` (tuỳ chọn) |
+| GET | `/api/contacts/:id` | Một yêu cầu |
+| GET | `/api/contacts/:id/attachment` | Tải/xem tệp đính kèm |
+| PATCH | `/api/contacts/:id` | Đổi `status` / `note` (không sửa lời người gửi) |
+| DELETE | `/api/contacts/:id` | Xoá yêu cầu **và** tệp đính kèm |
 | GET | `/api/dev-login/users` | Tài khoản để mạo danh — 403 nếu `DEV_LOGIN` chưa bật |
 | GET | `/api/dev-login/users/:id` | Một tài khoản theo **id** — 403 nếu chưa bật |
 
@@ -147,6 +166,25 @@ category_details(id INTEGER PK AUTOINCREMENT,
 -- Khoá ngoại được trỏ lại bằng bảng ánh xạ tạm nên quan hệ cha-con giữ nguyên.
 -- Regression test: src/database/sqlite.service.spec.ts
 
+articles(id INTEGER PK AUTOINCREMENT,
+         categoryDetailId INTEGER → category_details(id)   -- chuyên mục
+         slug TEXT UNIQUE, title, summary, content, coverImage,
+         author, publishedAt, status TEXT (draft|published|archived),
+         featured INTEGER, viewCount INTEGER,
+         createdAt, updatedAt)
+-- Cố ý KHÔNG ON DELETE CASCADE: xoá chuyên mục không được kéo theo bài viết.
+-- `readingMinutes` và `live` suy ra lúc đọc, không lưu thành cột.
+
+contacts(id INTEGER PK AUTOINCREMENT,
+         name, email, phone, subject, message,
+         attachmentName,   -- tên gốc, CHỈ để hiển thị
+         attachmentFile,   -- <uuid>.<ext> trên đĩa, dùng để đọc file
+         attachmentMime, attachmentSize,
+         status TEXT (new|in_progress|resolved|rejected),
+         note, handledBy, handledAt, createdAt, updatedAt)
+-- Tệp nằm ở data/uploads/contacts/, không phục vụ tĩnh.
+-- Xoá liên hệ thì xoá luôn tệp.
+
 permission_groups(id INTEGER PK AUTOINCREMENT, name, slug TEXT UNIQUE, description,
                   createdAt, updatedAt)
 
@@ -157,6 +195,83 @@ user_permission_groups(userId → users(id) ON DELETE CASCADE,
                        groupId → permission_groups(id) ON DELETE CASCADE,
                        assignedAt, PK(userId, groupId))
 ```
+
+## Liên hệ và tệp đính kèm
+
+Form ở trang ngoài ghi thẳng vào bảng `contacts`. Bốn trạng thái:
+
+| Trạng thái | Nghĩa |
+| --- | --- |
+| `new` | Chưa ai xử lý — con số duy nhất đáng báo động trên trang tổng quan |
+| `in_progress` | Đang xử lý |
+| `resolved` | Đã xử lý |
+| `rejected` | Không xử lý (spam, ngoài phạm vi) — vẫn lưu để còn đối chiếu |
+
+Đổi trạng thái sẽ ghi lại `handledBy` + `handledAt`; sửa ghi chú thì không,
+vì ghi chú không phải là xử lý. Trả về `new` thì xoá luôn hai dấu vết đó.
+
+### Tệp đính kèm
+
+Tệp nằm trên đĩa tại `data/uploads/contacts/`, cạnh file DB — sao lưu thư mục
+`data/` là có đủ cả hai. DB chỉ giữ thông tin mô tả, **tách làm hai cột**:
+
+- `attachmentFile` — tên do hệ thống sinh (`<uuid>.<ext>`), dùng để đọc file
+- `attachmentName` — tên gốc người gửi, **chỉ** để hiển thị lại
+
+Tên người dùng gửi lên không bao giờ chạm tới hệ thống tệp: nó có thể là
+`../../.env`, dài 4000 ký tự, hay chứa ký tự Windows không nhận.
+
+Các lớp kiểm soát (xem `contacts/attachments.ts`):
+
+- **Allowlist** định dạng, không phải blocklist. jpg, png, gif, webp, pdf, txt,
+  csv, doc, docx, xls, xlsx, zip. Tối đa 5MB, một tệp mỗi yêu cầu.
+- **SVG cố ý bị loại.** SVG là XML, trình duyệt chạy `<script>` bên trong khi
+  mở trực tiếp — người lạ gửi lên là có XSS ngay trên tên miền của mình.
+- **Chỉ ảnh và PDF được `Content-Disposition: inline`**, phần còn lại buộc tải
+  về. Luôn kèm `X-Content-Type-Options: nosniff`.
+- **Không có đường dẫn công khai.** Thư mục uploads không được phục vụ tĩnh;
+  muốn đọc phải qua `/api/contacts/:id/attachment` (cần api key) và ở phía
+  Next là `/admin/contacts/:id/attachment` (cần `requireAdmin`).
+- `resolveInsideDir` chặn thoát thư mục kể cả khi bản ghi trong DB bị sửa bậy.
+
+Một chi tiết dễ sót: busboy giải mã tham số `filename` theo **latin1**, nên
+"Báo cáo quý 1.pdf" tới service thành "BÃ¡o cÃ¡o quÃ½ 1.pdf".
+`decodeUploadName` dựng lại đúng dãy byte rồi đọc theo UTF-8.
+
+Test: `src/contacts/contacts.service.spec.ts`, `test/contacts.e2e-spec.ts`.
+
+## Bài viết
+
+Chuyên mục **không** có bảng riêng: nó là chi tiết của danh mục
+`DM_CHUYEN_MUC`, được seed lúc khởi động cùng 4 chuyên mục mặc định (Tin nội
+bộ, Hoạt động khách hàng, Tin công nghệ, Công nghệ thế giới). Nhờ vậy admin
+thêm/sửa/tắt chuyên mục ngay trong màn Danh mục, không cần màn hình riêng —
+cùng cơ chế với danh mục quyền.
+
+Ba trạng thái tách bạch vì ý nghĩa khác nhau:
+
+| Trạng thái | Nghĩa |
+| --- | --- |
+| `draft` | Bản nháp, chưa từng ra mắt |
+| `published` | Đã xuất bản |
+| `archived` | Đã đăng rồi gỡ xuống (giữ nguyên ngày đăng cũ) |
+
+Trường `live` được suy ra lúc đọc: `published` **và** `publishedAt <= bây giờ`.
+Đặt lịch đăng trước là việc bình thường của một toà soạn, nên bài `published`
+với ngày ở tương lai vẫn chưa hiện ở trang ngoài. Trang Tin tức gọi
+`?live=true` thay vì tự lọc, để quy tắc này chỉ nằm một chỗ.
+
+Vài điểm nữa:
+
+- `slug` duy nhất toàn bảng; trùng thì tự nối `-2`, `-3`… thay vì báo lỗi.
+  Đổi tiêu đề **không** đổi slug — link đã chia sẻ ra ngoài phải còn sống.
+- `published` mà bỏ trống ngày thì lấy thời điểm hiện tại ("đăng luôn").
+- `readingMinutes` suy ra từ độ dài nội dung (200 từ/phút), không lưu cột.
+- Khoá ngoại tới `category_details` không CASCADE: xoá chuyên mục đang có bài
+  bị chặn bằng 409 kèm thông báo rõ, thay vì để SQLite ném "FOREIGN KEY
+  constraint failed".
+
+Test: `src/articles/articles.service.spec.ts`, `test/articles.e2e-spec.ts`.
 
 ## Đăng nhập theo id khi phát triển
 
@@ -192,7 +307,7 @@ npm run set-role -- ban@gmail.com user    # hạ quyền
 
 ```bash
 npm test           # unit test UsersService trên file SQLite tạm
-npm run test:e2e   # e2e: health, api key, sync 2 lần, validation, cổng DEV_LOGIN
+npm run test:e2e   # e2e: health, api key, sync, DEV_LOGIN, bài viết, liên hệ
 ```
 
 ## Muốn đổi sang Postgres/MySQL?

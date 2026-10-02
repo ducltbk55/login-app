@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
+import { ArticlesModule } from './articles/articles.module';
 import { CategoriesModule } from './categories/categories.module';
+import { ContactsModule } from './contacts/contacts.module';
 import { DatabaseModule } from './database/database.module';
 import { DevLoginModule } from './dev-login/dev-login.module';
 import { HealthModule } from './health/health.module';
@@ -18,6 +20,8 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     PermissionGroupsModule,
     CategoriesModule,
+    ArticlesModule,
+    ContactsModule,
     HealthModule,
     DevLoginModule,
   ],

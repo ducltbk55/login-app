@@ -199,6 +199,67 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
       CREATE INDEX IF NOT EXISTS idx_category_details_groupDetailId
         ON category_details(groupDetailId);
     `);
+
+    // Bài viết. Chuyên mục là một chi tiết của danh mục DM_CHUYEN_MUC, tham
+    // chiếu bằng khoá ngoại thật: bài không có chuyên mục thì trang Tin tức
+    // không phân loại được, nên để DB chặn luôn thay vì dọn sau.
+    // Không ON DELETE CASCADE — xoá một chuyên mục không được phép kéo theo
+    // bài viết; CategoryDetailsService chặn việc đó bằng thông báo rõ ràng.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS articles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        categoryDetailId INTEGER NOT NULL REFERENCES category_details(id),
+        slug TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        summary TEXT,
+        content TEXT NOT NULL,
+        coverImage TEXT,
+        author TEXT NOT NULL,
+        publishedAt TEXT,
+        status TEXT NOT NULL DEFAULT 'draft',
+        featured INTEGER NOT NULL DEFAULT 0,
+        viewCount INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_articles_categoryDetailId
+        ON articles(categoryDetailId);
+      -- Trang Tin tức luôn lọc theo trạng thái rồi sắp theo ngày đăng.
+      CREATE INDEX IF NOT EXISTS idx_articles_status_publishedAt
+        ON articles(status, publishedAt DESC);
+    `);
+
+    // Yêu cầu liên hệ từ trang ngoài. Tệp đính kèm nằm trên đĩa
+    // (`data/uploads/contacts`), DB chỉ giữ thông tin mô tả:
+    //   attachmentFile = tên do hệ thống sinh, dùng để đọc file
+    //   attachmentName = tên gốc người gửi, CHỈ để hiển thị lại
+    // Tách hai cột vì tên người dùng gửi lên không bao giờ được chạm tới hệ
+    // thống tệp — xem `contacts/attachments.ts`.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT,
+        subject TEXT,
+        message TEXT NOT NULL,
+        attachmentName TEXT,
+        attachmentFile TEXT,
+        attachmentMime TEXT,
+        attachmentSize INTEGER,
+        status TEXT NOT NULL DEFAULT 'new',
+        note TEXT,
+        handledBy TEXT,
+        handledAt TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
+      -- Trang quản trị mặc định lọc theo trạng thái rồi sắp theo thời gian gửi.
+      CREATE INDEX IF NOT EXISTS idx_contacts_status_createdAt
+        ON contacts(status, createdAt DESC);
+    `);
   }
 
   /**
