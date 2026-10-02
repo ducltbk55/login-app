@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 
 import { CategoriesModule } from './categories/categories.module';
 import { DatabaseModule } from './database/database.module';
+import { DevLoginModule } from './dev-login/dev-login.module';
 import { HealthModule } from './health/health.module';
 import { PermissionGroupsModule } from './permission-groups/permission-groups.module';
 import { UsersModule } from './users/users.module';
@@ -18,6 +19,7 @@ import { UsersModule } from './users/users.module';
     PermissionGroupsModule,
     CategoriesModule,
     HealthModule,
+    DevLoginModule,
   ],
 })
 export class AppModule {}

@@ -59,16 +59,19 @@ export function RoleStatusForm({
             name="status"
             defaultValue={user.status}
             options={[
-              { value: "active", label: "active" },
-              { value: "blocked", label: "blocked" },
+              { value: "active", label: "Đang hoạt động" },
+              { value: "inactive", label: "Chờ duyệt" },
+              { value: "blocked", label: "Đã khoá" },
             ]}
           />
         </div>
       </div>
 
       <p className="rounded-lg bg-admin-surface-2 px-3 py-2 text-xs text-admin-muted">
-        Khoá tài khoản chặn được lần đăng nhập kế tiếp; phiên hiện tại của họ vẫn
-        còn hiệu lực tới khi hết hạn.
+        Tài khoản mới đăng ký ở trạng thái <strong>Chờ duyệt</strong> và chưa
+        đăng nhập được — chuyển sang <strong>Đang hoạt động</strong> để duyệt.
+        Khoá hoặc hạ về chờ duyệt chỉ chặn lần đăng nhập kế tiếp; phiên hiện tại
+        của họ vẫn còn hiệu lực tới khi hết hạn.
       </p>
 
       <Notice state={state} />

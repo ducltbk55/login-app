@@ -11,6 +11,8 @@ export const BUTTON = {
   secondary: `${BUTTON_BASE} border border-admin-border bg-admin-surface text-admin-text hover:border-brand-300 hover:bg-brand-50 dark:hover:bg-brand-500/10`,
   ghost: `${BUTTON_BASE} text-brand-700 hover:bg-brand-500/10 dark:text-brand-300`,
   danger: `${BUTTON_BASE} border border-red-500/40 text-red-600 hover:bg-red-500/10 dark:text-red-400`,
+  /** Đặc, dùng cho nút xác nhận trong hộp thoại xoá. */
+  dangerSolid: `${BUTTON_BASE} bg-red-600 text-white shadow-sm shadow-red-600/25 hover:bg-red-700 focus-visible:ring-red-500/50`,
 } as const;
 
 /** Nút nhỏ dùng trong ô thao tác của bảng. */

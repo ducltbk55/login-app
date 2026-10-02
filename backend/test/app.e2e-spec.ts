@@ -18,12 +18,32 @@ type SyncResponse = {
 type ListResponse = { total: number };
 
 describe('API (e2e)', () => {
-  const sync = (email: string) =>
+  const register = (email: string) =>
     request(app.getHttpServer())
       .post('/api/users/sync')
       .set('x-api-key', API_KEY)
-      .send({ email, provider: 'google' })
+      .send({ email, provider: 'google', mode: 'register' })
       .expect(200);
+
+  const login = (email: string) =>
+    request(app.getHttpServer())
+      .post('/api/users/sync')
+      .set('x-api-key', API_KEY)
+      .send({ email, provider: 'google', mode: 'login' })
+      .expect(200);
+
+  /** Đăng ký rồi duyệt — tài khoản dùng được ngay. */
+  const approve = (email: string) =>
+    request(app.getHttpServer())
+      .patch(`/api/users/${email}`)
+      .set('x-api-key', API_KEY)
+      .send({ status: 'active' })
+      .expect(200);
+
+  const registerApproved = async (email: string) => {
+    await register(email);
+    await approve(email);
+  };
 
   let app: INestApplication<App>;
   let tempDir: string;
@@ -70,22 +90,48 @@ describe('API (e2e)', () => {
       .expect(401);
   });
 
-  it('POST /api/users/sync đăng ký rồi ghi nhận đăng nhập', async () => {
-    const first = await request(app.getHttpServer())
+  it('đăng ký tạo tài khoản chờ duyệt, đăng nhập đòi đã duyệt', async () => {
+    const registered = await request(app.getHttpServer())
       .post('/api/users/sync')
       .set('x-api-key', API_KEY)
-      .send({ email: 'an@example.com', name: 'An', provider: 'google' })
+      .send({
+        email: 'an@example.com',
+        name: 'An',
+        provider: 'google',
+        mode: 'register',
+      })
       .expect(200);
-    expect(first.body).toMatchObject({ isNewUser: true });
+    expect(registered.body as SyncResponse).toMatchObject({
+      isNewUser: true,
+      user: { status: 'inactive', loginCount: 0 },
+    });
 
-    const second = await request(app.getHttpServer())
+    // Chưa duyệt thì chưa vào được.
+    await request(app.getHttpServer())
       .post('/api/users/sync')
       .set('x-api-key', API_KEY)
-      .send({ email: 'an@example.com', name: 'An', provider: 'google' })
-      .expect(200);
+      .send({ email: 'an@example.com', provider: 'google', mode: 'login' })
+      .expect(403);
+
+    // Đăng ký lại bằng email đã có cũng bị chặn.
+    await request(app.getHttpServer())
+      .post('/api/users/sync')
+      .set('x-api-key', API_KEY)
+      .send({ email: 'an@example.com', provider: 'google', mode: 'register' })
+      .expect(409);
+
+    // Email lạ thì không đăng nhập được và cũng không bị tạo ngầm.
+    await request(app.getHttpServer())
+      .post('/api/users/sync')
+      .set('x-api-key', API_KEY)
+      .send({ email: 'la@example.com', provider: 'google', mode: 'login' })
+      .expect(404);
+
+    await approve('an@example.com');
+    const second = await login('an@example.com');
     expect(second.body as SyncResponse).toMatchObject({
       isNewUser: false,
-      user: { loginCount: 2, email: 'an@example.com' },
+      user: { loginCount: 1, email: 'an@example.com' },
     });
 
     const list = await request(app.getHttpServer())
@@ -99,12 +145,19 @@ describe('API (e2e)', () => {
     await request(app.getHttpServer())
       .post('/api/users/sync')
       .set('x-api-key', API_KEY)
-      .send({ email: 'khong-phai-email', provider: 'facebook' })
+      .send({ email: 'khong-phai-email', provider: 'facebook', mode: 'login' })
+      .expect(400);
+
+    // Thiếu mode cũng không hợp lệ.
+    await request(app.getHttpServer())
+      .post('/api/users/sync')
+      .set('x-api-key', API_KEY)
+      .send({ email: 'an@example.com', provider: 'google' })
       .expect(400);
   });
 
   it('GET /api/users/stats đếm theo vai trò và trạng thái', async () => {
-    await sync('an@example.com');
+    await registerApproved('an@example.com');
     await request(app.getHttpServer())
       .patch('/api/users/an@example.com')
       .set('x-api-key', API_KEY)
@@ -116,11 +169,16 @@ describe('API (e2e)', () => {
       .set('x-api-key', API_KEY)
       .expect(200);
 
-    expect(response.body).toMatchObject({ total: 1, admins: 1, blocked: 0 });
+    expect(response.body).toMatchObject({
+      total: 1,
+      admins: 1,
+      pending: 0,
+      blocked: 0,
+    });
   });
 
   it('PUT /api/users/:email/groups gán nhóm quyền', async () => {
-    await sync('an@example.com');
+    await registerApproved('an@example.com');
     const group = await request(app.getHttpServer())
       .post('/api/permission-groups')
       .set('x-api-key', API_KEY)
@@ -141,7 +199,7 @@ describe('API (e2e)', () => {
   });
 
   it('tài khoản bị khoá thì POST /users/sync trả 403', async () => {
-    await sync('an@example.com');
+    await registerApproved('an@example.com');
     await request(app.getHttpServer())
       .patch('/api/users/an@example.com')
       .set('x-api-key', API_KEY)
@@ -151,7 +209,7 @@ describe('API (e2e)', () => {
     await request(app.getHttpServer())
       .post('/api/users/sync')
       .set('x-api-key', API_KEY)
-      .send({ email: 'an@example.com', provider: 'google' })
+      .send({ email: 'an@example.com', provider: 'google', mode: 'login' })
       .expect(403);
   });
 

@@ -9,6 +9,9 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
+/** Thời gian chờ khi file đang bị tiến trình khác giữ để ghi. */
+const BUSY_TIMEOUT_MS = 5000;
+
 /**
  * Kết nối SQLite bằng module `node:sqlite` có sẵn trong Node.js (>= 22.5),
  * nên không cần cài thêm native module nào.
@@ -30,6 +33,12 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
     this.database = new DatabaseSync(absolute);
     this.database.exec('PRAGMA journal_mode = WAL');
     this.database.exec('PRAGMA foreign_keys = ON');
+    // `node:sqlite` mặc định busy_timeout = 0: gặp tranh chấp là ném
+    // "database is locked" ngay, không chờ lấy một nhịp. WAL cho nhiều người
+    // đọc song song nhưng chỉ một người ghi, nên chỉ cần một script CLI
+    // (`seed:vn`, `set-role`) chạy cùng lúc với server là đủ gặp lỗi đó.
+    // Chờ tối đa 5 giây thì những va chạm thoáng qua tự giải quyết.
+    this.database.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
     this.migrate();
     this.logger.log(`SQLite đã sẵn sàng: ${absolute}`);
   }
@@ -156,6 +165,20 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
     // Bước cuối: mọi khoá chính/khoá ngoại chuyển từ GUID (TEXT) sang INTEGER.
     this.migrateIdsToInteger();
     this.migratePermissionCodesToUpperCase();
+
+    // Hồ sơ thành viên: Google chỉ cho tên/email/ảnh, phần còn lại người dùng
+    // tự khai sau khi đăng nhập lần đầu. Tất cả đều NULL được vì tài khoản vừa
+    // tạo thì chưa có gì.
+    for (const column of [
+      'phone',
+      'gender',
+      'birthDate',
+      'addressLine',
+      'provinceCode',
+      'wardCode',
+    ]) {
+      this.addColumnIfMissing('users', column, 'TEXT');
+    }
 
     // Phân nhóm: một danh mục có thể lấy danh mục khác làm "nhóm", khi đó mỗi
     // chi tiết thuộc về một chi tiết của danh mục nhóm đó.

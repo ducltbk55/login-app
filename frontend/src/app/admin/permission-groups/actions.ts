@@ -59,10 +59,18 @@ export async function updatePermissionGroupAction(
 }
 
 export async function deletePermissionGroupAction(
+  _prev: FormState,
   formData: FormData,
-): Promise<void> {
+): Promise<FormState> {
   await requireAdmin();
 
-  await deletePermissionGroup(String(formData.get("id") ?? ""));
+  try {
+    await deletePermissionGroup(String(formData.get("id") ?? ""));
+  } catch (error) {
+    if (error instanceof BackendError) return { error: error.message };
+    throw error;
+  }
+
   refresh();
+  return null;
 }

@@ -8,10 +8,16 @@ import {
 } from "@/components/admin/user-admin-forms";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/badge";
-import { formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { listPermissionGroups } from "@/lib/permission-groups";
 import { CARD, CARD_SUBTLE, CODE_CHIP } from "@/lib/styles";
-import { findUserByEmail, getLoginHistory } from "@/lib/users";
+import {
+  findUserByEmail,
+  getLoginHistory,
+  listProvinces,
+  listWards,
+  GENDER_LABELS,
+} from "@/lib/users";
 import { setUserGroupsAction, updateUserAction } from "../actions";
 
 export default async function AdminUserDetailPage(
@@ -27,6 +33,19 @@ export default async function AdminUserDetailPage(
   ]);
 
   if (!user) notFound();
+
+  // Mã tỉnh/phường lưu trong DB, đổi sang tên để hiển thị.
+  const [provinces, wards] = await Promise.all([
+    user.provinceCode ? listProvinces() : Promise.resolve([]),
+    user.provinceCode ? listWards(user.provinceCode) : Promise.resolve([]),
+  ]);
+  const address = [
+    user.addressLine,
+    wards.find((w) => w.code === user.wardCode)?.name,
+    provinces.find((p) => p.code === user.provinceCode)?.name,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   const facts = [
     { label: "Mã người dùng", value: `#${user.id}`, mono: true },
@@ -70,10 +89,16 @@ export default async function AdminUserDetailPage(
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${
                   user.status === "active"
                     ? "bg-emerald-400/20 text-emerald-100 ring-emerald-300/40"
-                    : "bg-red-400/20 text-red-100 ring-red-300/40"
+                    : user.status === "inactive"
+                      ? "bg-amber-400/20 text-amber-100 ring-amber-300/40"
+                      : "bg-red-400/20 text-red-100 ring-red-300/40"
                 }`}
               >
-                {user.status}
+                {user.status === "active"
+                  ? "Đang hoạt động"
+                  : user.status === "inactive"
+                    ? "Chờ duyệt"
+                    : "Đã khoá"}
               </span>
             </div>
           </div>
@@ -93,6 +118,45 @@ export default async function AdminUserDetailPage(
             </p>
           </div>
         ))}
+      </section>
+
+      <section className={`${CARD_SUBTLE} space-y-3`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold">Hồ sơ thành viên</h3>
+          <Badge tone={user.profileCompleted ? "success" : "neutral"}>
+            {user.profileCompleted ? "đã hoàn tất" : "chưa hoàn tất"}
+          </Badge>
+        </div>
+        <div className="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <p className="text-xs font-medium tracking-wide text-admin-muted uppercase">
+              Số điện thoại
+            </p>
+            <p className="mt-1">{user.phone ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium tracking-wide text-admin-muted uppercase">
+              Giới tính
+            </p>
+            <p className="mt-1">
+              {user.gender ? GENDER_LABELS[user.gender] : "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium tracking-wide text-admin-muted uppercase">
+              Ngày sinh
+            </p>
+            <p className="mt-1">
+              {user.birthDate ? formatDate(user.birthDate) : "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium tracking-wide text-admin-muted uppercase">
+              Địa chỉ
+            </p>
+            <p className="mt-1 break-words">{address || "—"}</p>
+          </div>
+        </div>
       </section>
 
       <div className="grid gap-5 lg:grid-cols-2">

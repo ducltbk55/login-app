@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
+import { AddressService } from '../categories/address.service';
 import { CategoriesService } from '../categories/categories.service';
 import { CategoryDetailsService } from '../categories/category-details.service';
 import { PermissionCatalogService } from '../permission-groups/permission-catalog.service';
@@ -149,6 +150,7 @@ describe('SqliteService: migrate khoa GUID sang INTEGER', () => {
         PermissionCatalogService,
         CategoriesService,
         CategoryDetailsService,
+        AddressService,
       ],
     }).compile();
 
@@ -264,7 +266,11 @@ describe('SqliteService: migrate khoa GUID sang INTEGER', () => {
     const detail = details.create(created.id, { name: 'Con' });
     expect(detail.categoryId).toBe(created.id);
 
-    const synced = users.sync({ email: 'moi@example.com', provider: 'google' });
+    const synced = users.sync({
+      email: 'moi@example.com',
+      provider: 'google',
+      mode: 'register',
+    });
     expect(synced.user.id).toBe(3); // sau u-aaa (1) và u-bbb (2)
     expect(synced.user.accountId).toMatch(/^[0-9a-f-]{36}$/);
   });
@@ -317,6 +323,7 @@ describe('SqliteService: migrate khoa GUID sang INTEGER', () => {
         PermissionCatalogService,
         CategoriesService,
         CategoryDetailsService,
+        AddressService,
       ],
     }).compile();
     await moduleRef.init();

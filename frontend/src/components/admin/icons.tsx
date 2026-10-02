@@ -205,3 +205,23 @@ export function PencilIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function LoginIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9.5 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3.5" />
+      <path d="M14 8.5 17.5 12 14 15.5" />
+      <path d="M17.5 12H8" />
+    </Icon>
+  );
+}
+
+export function UserPlusIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M18.5 7.5v5M21 10h-5" />
+    </Icon>
+  );
+}

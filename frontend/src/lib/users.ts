@@ -1,7 +1,18 @@
 import { request, requestOptional, segment } from "./backend";
 
 export type UserRole = "admin" | "user";
-export type UserStatus = "active" | "blocked";
+/** `inactive` = vừa đăng ký, chờ duyệt; `blocked` = bị khoá. */
+export type UserStatus = "active" | "inactive" | "blocked";
+
+export const USER_GENDERS = ["male", "female", "other"] as const;
+export type UserGender = (typeof USER_GENDERS)[number];
+
+/** Nhãn tiếng Việt cho giới tính. */
+export const GENDER_LABELS: Record<UserGender, string> = {
+  male: "Nam",
+  female: "Nữ",
+  other: "Khác",
+};
 
 export type StoredUser = {
   /** Khoá chính số, tự tăng. */
@@ -17,7 +28,29 @@ export type StoredUser = {
   createdAt: string;
   lastLoginAt: string;
   loginCount: number;
+
+  /* ---- hồ sơ do người dùng tự khai sau khi đăng nhập ---- */
+  phone: string | null;
+  gender: UserGender | null;
+  /** `YYYY-MM-DD`. */
+  birthDate: string | null;
+  addressLine: string | null;
+  provinceCode: string | null;
+  wardCode: string | null;
+  /** Đã khai đủ các trường bắt buộc chưa — backend suy ra. */
+  profileCompleted: boolean;
 };
+
+export type ProfileInput = {
+  phone: string;
+  gender: UserGender;
+  birthDate: string;
+  addressLine: string;
+  provinceCode: string;
+  wardCode: string;
+};
+
+export type AddressOption = { code: string; name: string };
 
 export type UserGroupRef = { id: number; name: string; slug: string };
 
@@ -34,7 +67,13 @@ export type LoginEvent = {
   occurredAt: string;
 };
 
-export type UserStats = { total: number; admins: number; blocked: number };
+export type UserStats = {
+  total: number;
+  admins: number;
+  /** Đang chờ duyệt (status = inactive). */
+  pending: number;
+  blocked: number;
+};
 
 export type ListUsersQuery = {
   search?: string;
@@ -43,11 +82,15 @@ export type ListUsersQuery = {
 };
 
 /** Đăng ký (lần đầu) hoặc ghi nhận đăng nhập (các lần sau). */
+/** Đăng nhập và đăng ký là hai luồng tách bạch ở backend. */
+export type SyncMode = "login" | "register";
+
 export async function registerOrLogin(input: {
   email: string;
   name?: string | null;
   image?: string | null;
   provider: string;
+  mode: SyncMode;
 }): Promise<{ user: StoredUser; isNewUser: boolean }> {
   return request<{ user: StoredUser; isNewUser: boolean }>("/users/sync", {
     method: "POST",
@@ -56,6 +99,7 @@ export async function registerOrLogin(input: {
       name: input.name ?? null,
       image: input.image ?? null,
       provider: input.provider,
+      mode: input.mode,
     }),
   });
 }
@@ -114,4 +158,29 @@ export async function setUserGroups(
     method: "PUT",
     body: JSON.stringify({ groupIds }),
   });
+}
+
+/** Người dùng tự khai hồ sơ; không đụng tới vai trò và trạng thái. */
+export async function updateProfile(
+  email: string,
+  input: ProfileInput,
+): Promise<StoredUserDetail> {
+  return request<StoredUserDetail>(`/users/${segment(email)}/profile`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function listProvinces(): Promise<AddressOption[]> {
+  const result = await request<{ items: AddressOption[] }>("/address/provinces");
+  return result.items;
+}
+
+export async function listWards(
+  provinceCode: string,
+): Promise<AddressOption[]> {
+  const result = await request<{ items: AddressOption[] }>(
+    `/address/wards?provinceCode=${segment(provinceCode)}`,
+  );
+  return result.items;
 }

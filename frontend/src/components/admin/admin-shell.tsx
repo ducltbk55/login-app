@@ -13,7 +13,11 @@ import {
   MenuIcon,
   PanelLeftIcon,
 } from "@/components/admin/icons";
-import { COMPANY_LOGO, COMPANY_NAME } from "@/lib/company";
+import {
+  COMPANY_LOGO,
+  COMPANY_NAME,
+  COMPANY_SHORT_NAME,
+} from "@/lib/company";
 
 /** Nhớ trạng thái thu gọn giữa các lần tải trang. */
 const COLLAPSE_COOKIE = "admin_sidebar";
@@ -199,7 +203,7 @@ export function AdminShell({
               />
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold text-admin-text">
-                  {COMPANY_NAME}
+                  {COMPANY_SHORT_NAME}
                 </span>
                 <span className="hidden truncate text-xs text-admin-muted sm:block">
                   Trang quản trị

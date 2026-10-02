@@ -29,6 +29,8 @@ export function SearchableSelect({
   required = false,
   searchPlaceholder = "Gõ để tìm…",
   emptyLabel = "Không có lựa chọn nào",
+  disabled = false,
+  onChange,
 }: {
   name: string;
   options: SelectOption[];
@@ -37,6 +39,9 @@ export function SearchableSelect({
   required?: boolean;
   searchPlaceholder?: string;
   emptyLabel?: string;
+  disabled?: boolean;
+  /** Dùng khi một ô chọn khác phải nạp lại theo giá trị này (tỉnh → phường). */
+  onChange?: (value: string) => void;
 }) {
   const [value, setValue] = useState(defaultValue);
   const [open, setOpen] = useState(false);
@@ -79,6 +84,7 @@ export function SearchableSelect({
   const choose = (option: SelectOption) => {
     setValue(option.value);
     setOpen(false);
+    onChange?.(option.value);
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -129,10 +135,11 @@ export function SearchableSelect({
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls={listboxId}
+        disabled={disabled}
         onClick={() => (open ? setOpen(false) : openMenu())}
-        className={`${INPUT} flex cursor-pointer items-center gap-2 text-left ${
-          open ? "border-brand-500 ring-2 ring-brand-500/25" : ""
-        }`}
+        className={`${INPUT} flex items-center gap-2 text-left ${
+          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+        } ${open ? "border-brand-500 ring-2 ring-brand-500/25" : ""}`}
       >
         <span
           className={`min-w-0 flex-1 truncate ${

@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+import { CategoriesModule } from '../categories/categories.module';
 import { DatabaseModule } from '../database/database.module';
 import { PermissionGroupsModule } from '../permission-groups/permission-groups.module';
 import { PermissionGroupsService } from '../permission-groups/permission-groups.service';
@@ -27,6 +28,7 @@ describe('UsersService', () => {
         }),
         DatabaseModule,
         PermissionGroupsModule,
+        CategoriesModule,
       ],
       providers: [UsersService],
     }).compile();
@@ -41,49 +43,93 @@ describe('UsersService', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('đăng ký người dùng mới ở lần đồng bộ đầu tiên', () => {
+  /** Đăng ký rồi duyệt — tài khoản dùng được ngay, như hành vi trước đây. */
+  const registerApproved = (email: string, name?: string) => {
+    users.sync({ email, name, provider: 'google', mode: 'register' });
+    return users.update(email, { status: 'active' });
+  };
+
+  const login = (
+    email: string,
+    extra: { name?: string; image?: string } = {},
+  ) => users.sync({ email, provider: 'google', mode: 'login', ...extra });
+
+  it('đăng ký tạo tài khoản ở trạng thái chờ duyệt', () => {
     const result = users.sync({
       email: 'an@example.com',
       name: 'An',
       image: null,
       provider: 'google',
+      mode: 'register',
     });
 
     expect(result.isNewUser).toBe(true);
     expect(result.user.email).toBe('an@example.com');
-    expect(result.user.loginCount).toBe(1);
+    expect(result.user.status).toBe('inactive');
     expect(result.user.role).toBe('user');
-    expect(result.user.status).toBe('active');
+    // Chưa duyệt thì chưa đăng nhập được lần nào.
+    expect(result.user.loginCount).toBe(0);
+    expect(users.findLoginHistory('an@example.com')).toHaveLength(0);
     expect(users.countAll()).toBe(1);
   });
 
-  it('lần sau chỉ ghi nhận đăng nhập, không tạo bản ghi trùng', () => {
-    users.sync({ email: 'an@example.com', name: 'An', provider: 'google' });
-    const second = users.sync({
+  it('đăng ký lại bằng email đã có thì bị từ chối', () => {
+    users.sync({
       email: 'an@example.com',
+      provider: 'google',
+      mode: 'register',
+    });
+
+    expect(() =>
+      users.sync({
+        email: 'an@example.com',
+        provider: 'google',
+        mode: 'register',
+      }),
+    ).toThrow(/đã đăng ký/);
+    expect(users.countAll()).toBe(1);
+  });
+
+  it('chưa đăng ký thì không đăng nhập được', () => {
+    expect(() => login('la@example.com')).toThrow(/chưa đăng ký/);
+    expect(users.countAll()).toBe(0);
+  });
+
+  it('chờ duyệt thì chưa đăng nhập được', () => {
+    users.sync({
+      email: 'an@example.com',
+      provider: 'google',
+      mode: 'register',
+    });
+
+    expect(() => login('an@example.com')).toThrow(/chờ quản trị viên duyệt/);
+  });
+
+  it('duyệt xong thì đăng nhập được và cập nhật tên/ảnh', () => {
+    registerApproved('an@example.com', 'An');
+    const second = login('an@example.com', {
       name: 'An Nguyễn',
       image: 'https://example.com/a.png',
-      provider: 'google',
     });
 
     expect(second.isNewUser).toBe(false);
-    expect(second.user.loginCount).toBe(2);
+    expect(second.user.loginCount).toBe(1);
     expect(second.user.name).toBe('An Nguyễn');
     expect(second.user.image).toBe('https://example.com/a.png');
     expect(users.countAll()).toBe(1);
   });
 
   it('lưu lịch sử đăng nhập cho từng lần', () => {
-    users.sync({ email: 'an@example.com', provider: 'google' });
-    users.sync({ email: 'an@example.com', provider: 'google' });
+    registerApproved('an@example.com');
+    login('an@example.com');
+    login('an@example.com');
 
     expect(users.findLoginHistory('an@example.com')).toHaveLength(2);
   });
 
   it('giới hạn số dòng lịch sử trả về', () => {
-    for (let i = 0; i < 3; i++) {
-      users.sync({ email: 'an@example.com', provider: 'google' });
-    }
+    registerApproved('an@example.com');
+    for (let i = 0; i < 3; i++) login('an@example.com');
 
     expect(users.findLoginHistory('an@example.com', 2)).toHaveLength(2);
     // limit không hợp lệ được đưa về khoảng cho phép thay vì lọt vào SQL.
@@ -99,7 +145,7 @@ describe('UsersService', () => {
 
   describe('quản trị', () => {
     beforeEach(() => {
-      users.sync({ email: 'an@example.com', name: 'An', provider: 'google' });
+      registerApproved('an@example.com', 'An');
     });
 
     it('đổi vai trò và trạng thái', () => {
@@ -122,7 +168,7 @@ describe('UsersService', () => {
     });
 
     it('cho hạ quyền khi đã có admin khác', () => {
-      users.sync({ email: 'binh@example.com', provider: 'google' });
+      registerApproved('binh@example.com');
       users.update('an@example.com', { role: 'admin' });
       users.update('binh@example.com', { role: 'admin' });
 
@@ -132,14 +178,22 @@ describe('UsersService', () => {
     });
 
     it('tài khoản bị khoá không đăng nhập được nữa', () => {
-      users.sync({ email: 'binh@example.com', provider: 'google' });
+      registerApproved('binh@example.com');
+      login('binh@example.com');
       users.update('binh@example.com', { status: 'blocked' });
 
-      expect(() =>
-        users.sync({ email: 'binh@example.com', provider: 'google' }),
-      ).toThrow(/bị khoá/);
+      expect(() => login('binh@example.com')).toThrow(/bị khoá/);
       // Không được ghi thêm lịch sử đăng nhập cho lần bị chặn.
       expect(users.findLoginHistory('binh@example.com')).toHaveLength(1);
+    });
+
+    it('hạ về chờ duyệt thì cũng không đăng nhập được', () => {
+      registerApproved('binh@example.com');
+      users.update('binh@example.com', { status: 'inactive' });
+
+      expect(() => login('binh@example.com')).toThrow(
+        /chờ quản trị viên duyệt/,
+      );
     });
 
     it('gán nhóm quyền và tính quyền hiệu lực', () => {
@@ -178,11 +232,7 @@ describe('UsersService', () => {
     });
 
     it('lọc danh sách theo tên, vai trò, trạng thái', () => {
-      users.sync({
-        email: 'binh@example.com',
-        name: 'Bình',
-        provider: 'google',
-      });
+      registerApproved('binh@example.com', 'Bình');
       users.update('binh@example.com', { role: 'admin' });
 
       expect(users.findAll({ search: 'bình' }).map((u) => u.email)).toEqual([

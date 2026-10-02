@@ -20,6 +20,7 @@ const TONES = {
   brand: "bg-brand-500/12 text-brand-600 dark:text-brand-300",
   deep: "bg-brand-900/10 text-brand-800 dark:bg-brand-400/15 dark:text-brand-200",
   danger: "bg-red-500/12 text-red-600 dark:text-red-400",
+  warning: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
 } as const;
 
 export default async function AdminOverviewPage() {
@@ -44,6 +45,14 @@ export default async function AdminOverviewPage() {
       href: "/admin/users?role=admin",
       icon: LockIcon,
       tone: TONES.deep,
+    },
+    {
+      label: "Chờ duyệt",
+      value: stats.pending,
+      href: "/admin/users?status=inactive",
+      icon: ClockIcon,
+      // Có người chờ thì nhấn màu vàng cho dễ thấy, hết thì để trung tính.
+      tone: stats.pending > 0 ? TONES.warning : TONES.brand,
     },
     {
       label: "Bị khoá",
@@ -95,7 +104,7 @@ export default async function AdminOverviewPage() {
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6">
         {tiles.map((tile) => {
           const Icon = tile.icon;
 

@@ -17,6 +17,23 @@
   --brand-900: #183472;
   --brand-950: #0f2047;
 
+  /* Tông vàng kim của logo, dùng cho trang giới thiệu công ty. */
+  --gold-50: #fdf8ec;
+  --gold-100: #faeec9;
+  --gold-200: #f3dc94;
+  --gold-300: #e9c45a;
+  --gold-400: #ddae33;
+  --gold-500: #c99421;
+  --gold-600: #a9761a;
+  --gold-700: #875a18;
+  --gold-800: #70491a;
+  --gold-900: #5f3d1b;
+
+  /* Nền tối của trang giới thiệu — cố định, không đổi theo dark mode. */
+  --ink-900: #0b0b0d;
+  --ink-800: #141418;
+  --ink-700: #1e1e24;
+
   /* Bề mặt của riêng trang quản trị (đảo màu ở khối dark bên dưới). */
   --admin-bg: #eef3fb;
   --admin-surface: #ffffff;
@@ -59,6 +76,21 @@
   --color-brand-800: var(--brand-800);
   --color-brand-900: var(--brand-900);
   --color-brand-950: var(--brand-950);
+
+  --color-gold-50: var(--gold-50);
+  --color-gold-100: var(--gold-100);
+  --color-gold-200: var(--gold-200);
+  --color-gold-300: var(--gold-300);
+  --color-gold-400: var(--gold-400);
+  --color-gold-500: var(--gold-500);
+  --color-gold-600: var(--gold-600);
+  --color-gold-700: var(--gold-700);
+  --color-gold-800: var(--gold-800);
+  --color-gold-900: var(--gold-900);
+
+  --color-ink-900: var(--ink-900);
+  --color-ink-800: var(--ink-800);
+  --color-ink-700: var(--ink-700);
 
   --color-admin-bg: var(--admin-bg);
   --color-admin-surface: var(--admin-surface);

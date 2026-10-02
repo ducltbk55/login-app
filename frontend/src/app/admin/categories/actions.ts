@@ -19,6 +19,23 @@ import {
 export type FormState = { error?: string } | null;
 
 /**
+ * Xoá có thể hỏng vì ràng buộc nghiệp vụ (409: danh mục đang được dùng làm
+ * nhóm, chi tiết đang là nhóm của chi tiết khác). Trả lỗi về cho hộp thoại
+ * hiển thị, thay vì để nó ném ra và vỡ cả trang.
+ */
+async function remove(work: () => Promise<void>): Promise<FormState> {
+  try {
+    await work();
+  } catch (error) {
+    if (error instanceof BackendError) return { error: error.message };
+    throw error;
+  }
+
+  refresh();
+  return null;
+}
+
+/**
  * Ô select rỗng nghĩa là "không chọn" → gửi `null` để server hiểu là bỏ nhóm.
  * Trả `undefined` khi trường không có trong form (server giữ nguyên giá trị cũ).
  */
@@ -149,11 +166,13 @@ export async function toggleCategoryAction(formData: FormData): Promise<void> {
   refresh();
 }
 
-export async function deleteCategoryAction(formData: FormData): Promise<void> {
+export async function deleteCategoryAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
   await requireAdmin();
 
-  await deleteCategory(String(formData.get("id") ?? ""));
-  refresh();
+  return remove(() => deleteCategory(String(formData.get("id") ?? "")));
 }
 
 /* ------------------------------------------------ chi tiết của một danh mục */
@@ -205,13 +224,15 @@ export async function toggleCategoryDetailAction(
 }
 
 export async function deleteCategoryDetailAction(
+  _prev: FormState,
   formData: FormData,
-): Promise<void> {
+): Promise<FormState> {
   await requireAdmin();
 
-  await deleteCategoryDetail(
-    String(formData.get("categoryId") ?? ""),
-    String(formData.get("id") ?? ""),
+  return remove(() =>
+    deleteCategoryDetail(
+      String(formData.get("categoryId") ?? ""),
+      String(formData.get("id") ?? ""),
+    ),
   );
-  refresh();
 }

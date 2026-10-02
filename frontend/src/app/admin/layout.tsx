@@ -19,7 +19,7 @@ export default async function AdminLayout({
     <AdminShell
       // Hộp thoại tài khoản ở header hiển thị đủ thông tin nên truyền cả bản ghi.
       admin={admin}
-      signOutSlot={<SignOutButton variant="confirm" />}
+      signOutSlot={<SignOutButton />}
       initialCollapsed={collapsed}
     >
       {children}

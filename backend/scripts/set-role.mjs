@@ -33,6 +33,9 @@ function databaseFile() {
 
 const file = path.resolve(process.cwd(), databaseFile());
 const db = new DatabaseSync(file);
+// Script này thường chạy lúc server vẫn đang bật. Mặc định `node:sqlite` không
+// chờ chút nào nên sẽ ném "database is locked" ngay nếu server đang ghi.
+db.exec('PRAGMA busy_timeout = 5000');
 const user = db.prepare('SELECT id, email, role FROM users WHERE email = ?').get(email);
 
 if (!user) {

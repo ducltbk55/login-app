@@ -1,11 +1,18 @@
 import { signInWithGoogle } from "@/app/actions";
 
-export function GoogleSignInButton({ label = "Tiếp tục với Google" }: { label?: string }) {
+/** `action` để trang đăng ký truyền vào `registerWithGoogle` thay vì đăng nhập. */
+export function GoogleSignInButton({
+  label = "Tiếp tục với Google",
+  action = signInWithGoogle,
+}: {
+  label?: string;
+  action?: () => Promise<void>;
+}) {
   return (
-    <form action={signInWithGoogle}>
+    <form action={action}>
       <button
         type="submit"
-        className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-full border border-black/10 bg-white px-6 py-3 text-sm font-medium text-neutral-800 shadow-sm transition hover:bg-neutral-50 hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:border-white/15 dark:focus-visible:ring-offset-neutral-950"
+        className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-lg border border-black/15 bg-white px-6 py-3 text-sm font-semibold text-neutral-800 shadow-sm transition hover:bg-neutral-50 hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2"
       >
         <GoogleLogo />
         {label}

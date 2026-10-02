@@ -7,6 +7,7 @@ import {
   PageHeader,
 } from "@/components/admin/page-header";
 import { SearchableSelect } from "@/components/admin/searchable-select";
+import { UserStatusBadge } from "@/components/admin/user-status-badge";
 import { Badge } from "@/components/badge";
 import { formatDateTime } from "@/lib/format";
 import { BUTTON, INPUT, ROW_CARD, TABLE } from "@/lib/styles";
@@ -61,8 +62,9 @@ export default async function AdminUsersPage(
             defaultValue={status ?? ""}
             options={[
               { value: "", label: "Tất cả" },
-              { value: "active", label: "active" },
-              { value: "blocked", label: "blocked" },
+              { value: "active", label: "Đang hoạt động" },
+              { value: "inactive", label: "Chờ duyệt" },
+              { value: "blocked", label: "Đã khoá" },
             ]}
           />
         </Field>
@@ -108,9 +110,7 @@ export default async function AdminUsersPage(
                 <Badge tone={user.role === "admin" ? "brand" : "neutral"}>
                   {user.role}
                 </Badge>
-                <Badge tone={user.status === "active" ? "success" : "danger"}>
-                  {user.status}
-                </Badge>
+                <UserStatusBadge status={user.status} />
               </div>
 
               <dl className="grid grid-cols-2 gap-2 border-t border-admin-border/60 pt-3 text-xs">
@@ -170,11 +170,7 @@ export default async function AdminUsersPage(
                   </Badge>
                 </td>
                 <td className={TABLE.td}>
-                  <Badge
-                    tone={user.status === "active" ? "success" : "danger"}
-                  >
-                    {user.status}
-                  </Badge>
+                  <UserStatusBadge status={user.status} />
                 </td>
                 <td className={`${TABLE.td} text-admin-muted`}>
                   {formatDateTime(user.lastLoginAt)}

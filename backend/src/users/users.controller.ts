@@ -16,6 +16,7 @@ import { ApiKeyGuard } from '../common/api-key.guard';
 import { AssignGroupsDto } from './dto/assign-groups.dto';
 import { ListUsersDto } from './dto/list-users.dto';
 import { SyncUserDto } from './dto/sync-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import type {
   LoginEvent,
@@ -70,6 +71,15 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
   ): UserDetail {
     return this.users.update(email, dto);
+  }
+
+  /** Chủ tài khoản tự khai hồ sơ sau khi đăng nhập. */
+  @Patch(':email/profile')
+  updateProfile(
+    @Param('email') email: string,
+    @Body() dto: UpdateProfileDto,
+  ): UserDetail {
+    return this.users.updateProfile(email, dto);
   }
 
   /** Thay toàn bộ nhóm quyền của user (admin). */
