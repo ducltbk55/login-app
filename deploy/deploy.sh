@@ -6,7 +6,8 @@
 #
 # Lệnh:
 #   init     tạo deploy/env/<môi trường>.env từ file mẫu, sinh sẵn mật khẩu/secret
-#   deploy   chép code sang máy đích, build & chạy (nginx, frontend, backend, db)
+#   deploy   build & chạy (nginx, frontend, backend, db); production chép code
+#            sang máy chủ trước, local chạy thẳng tại thư mục mã nguồn này
 #   status   xem trạng thái container
 #   logs     xem log (theo dõi liên tục)
 #   down     dừng hệ thống (giữ nguyên dữ liệu trong volume)
@@ -109,11 +110,9 @@ if [[ "$INSTALLED" == "true" ]]; then
   DEPLOY_PATH="$(dirname "$ROOT")"
 fi
 
-# DEPLOY_IN_PLACE=true (chỉ local): build & chạy thẳng từ thư mục mã nguồn này,
-# không chép sang DEPLOY_PATH.
+# Local luôn build & chạy thẳng từ thư mục mã nguồn này, không chép đi đâu.
 IN_PLACE=false
-if [[ "${DEPLOY_IN_PLACE:-false}" == "true" && "$INSTALLED" != "true" ]]; then
-  [[ "$TARGET" == "local" ]] || die "DEPLOY_IN_PLACE chỉ dùng cho môi trường local."
+if [[ "$TARGET" == "local" && "$INSTALLED" != "true" ]]; then
   IN_PLACE=true
 fi
 
@@ -157,7 +156,7 @@ remote() {
 
 # Đặt biến trên máy đích: $app = thư mục code, $env = file .env của hệ thống.
 # Bình thường: <DEPLOY_PATH>/app và <DEPLOY_PATH>/.env (`~` mở rộng phía máy đích).
-# DEPLOY_IN_PLACE: chính thư mục mã nguồn, .env sinh ra ở deploy/.runtime/.
+# Local: chính thư mục mã nguồn, .env sinh ra ở deploy/.runtime/.
 if [[ "$IN_PLACE" == "true" ]]; then
   REMOTE_DIR_EXPR="app=$(printf '%q' "$ROOT"); env=\"\$app/deploy/.runtime/$TARGET.env\""
 else
