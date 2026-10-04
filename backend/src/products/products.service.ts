@@ -13,7 +13,7 @@ import { PRODUCT_CATEGORY_CODE } from '../common/product-categories';
 import { matchesSearch } from '../common/search';
 import { parseVideoUrl } from '../common/video';
 import { slugify } from '../common/slugify';
-import { SqliteService } from '../database/sqlite.service';
+import { DatabaseService } from '../database/database.service';
 import { ListProductsDto } from './dto/list-products.dto';
 import { CreateProductDto, UpdateProductDto } from './dto/save-product.dto';
 import {
@@ -25,8 +25,8 @@ import {
 } from './product.entity';
 
 type ProductRow = {
-  id: number | bigint;
-  categoryDetailId: number | bigint;
+  id: number;
+  categoryDetailId: number;
   slug: string;
   name: string;
   sku: string | null;
@@ -36,11 +36,11 @@ type ProductRow = {
   gallery: string | null;
   specs: string | null;
   videoUrl: string | null;
-  price: number | bigint | null;
-  salePrice: number | bigint | null;
+  price: number | null;
+  salePrice: number | null;
   launchedAt: string | null;
   status: string;
-  inStock: number | bigint;
+  inStock: number;
   createdAt: string;
   updatedAt: string;
   categoryCode: string | null;
@@ -112,7 +112,7 @@ function cleanVideoUrl(url: string | null): string | null {
 /** Bỏ ảnh trùng, giữ thứ tự lần xuất hiện đầu. */
 const uniqueGallery = (urls: string[]) => [...new Set(urls)];
 
-const toNumber = (value: number | bigint | null): number | null =>
+const toNumber = (value: number | null): number | null =>
   value === null ? null : Number(value);
 
 /** Mốc "ra mắt" để sắp xếp: chưa đặt ngày ra mắt thì dùng ngày tạo. */
@@ -141,7 +141,7 @@ const SORTERS: Record<ProductSort, (a: Product, b: Product) => number> = {
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly sqlite: SqliteService) {}
+  constructor(private readonly db: DatabaseService) {}
 
   private toProduct(row: ProductRow): Product {
     const status = row.status as ProductStatus;
@@ -190,7 +190,7 @@ export class ProductsService {
               LEFT JOIN category_details d ON d.id = p.categoryDetailId`;
   }
 
-  list(query: ListProductsDto = {}): Product[] {
+  async list(query: ListProductsDto = {}): Promise<Product[]> {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
@@ -211,12 +211,11 @@ export class ProductsService {
       params.push(...query.ids);
     }
 
-    const rows = this.sqlite.db
-      .prepare(
-        `${this.selectAll()}
-         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`,
-      )
-      .all(...params) as ProductRow[];
+    const rows = await this.db.all<ProductRow>(
+      `${this.selectAll()}
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`,
+      params,
+    );
 
     let items = rows.map((row) => this.toProduct(row));
 
@@ -231,7 +230,7 @@ export class ProductsService {
       );
     }
 
-    // Lọc chữ trong JS vì SQLite dựng sẵn không bỏ dấu được — xem common/search.ts
+    // Lọc chữ trong JS để khớp cả khi gõ không dấu — xem common/search.ts
     if (query.search) {
       const search = query.search;
       items = items.filter((p) => matchesSearch(search, p.name, p.sku));
@@ -242,56 +241,56 @@ export class ProductsService {
     return items.sort((a, b) => sorter(a, b) || b.id - a.id);
   }
 
-  findOne(id: number): Product | null {
-    const row = this.sqlite.db
-      .prepare(`${this.selectAll()} WHERE p.id = ?`)
-      .get(id) as ProductRow | undefined;
+  async findOne(id: number): Promise<Product | null> {
+    const row = await this.db.get<ProductRow>(
+      `${this.selectAll()} WHERE p.id = ?`,
+      [id],
+    );
     return row ? this.toProduct(row) : null;
   }
 
-  findOneOrFail(id: number): Product {
-    const product = this.findOne(id);
+  async findOneOrFail(id: number): Promise<Product> {
+    const product = await this.findOne(id);
     if (!product) throw new NotFoundException(`Không có sản phẩm #${id}`);
     return product;
   }
 
-  findBySlug(slug: string): Product | null {
-    const row = this.sqlite.db
-      .prepare(`${this.selectAll()} WHERE p.slug = ?`)
-      .get(slug) as ProductRow | undefined;
+  async findBySlug(slug: string): Promise<Product | null> {
+    const row = await this.db.get<ProductRow>(
+      `${this.selectAll()} WHERE p.slug = ?`,
+      [slug],
+    );
     return row ? this.toProduct(row) : null;
   }
 
-  count(): number {
-    const row = this.sqlite.db
-      .prepare('SELECT COUNT(*) AS total FROM products')
-      .get() as { total: number | bigint } | undefined;
+  async count(): Promise<number> {
+    const row = await this.db.get<{ total: number }>(
+      'SELECT COUNT(*) AS total FROM products',
+    );
     return Number(row?.total ?? 0);
   }
 
-  create(dto: CreateProductDto): Product {
-    return this.sqlite.transaction(() => {
-      this.assertCategory(dto.categoryDetailId);
+  async create(dto: CreateProductDto): Promise<Product> {
+    return this.db.transaction(async () => {
+      await this.assertCategory(dto.categoryDetailId);
 
       const price = dto.price ?? null;
       const salePrice = dto.salePrice ?? null;
       this.assertPrices(price, salePrice);
 
       const sku = dto.sku ?? null;
-      this.assertSkuFree(sku);
+      await this.assertSkuFree(sku);
 
       const now = new Date().toISOString();
-      const result = this.sqlite.db
-        .prepare(
-          `INSERT INTO products
-             (categoryDetailId, slug, name, sku, summary, description, image,
-              gallery, specs, videoUrl, price, salePrice, launchedAt, status,
-              inStock, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
+      const result = await this.db.run(
+        `INSERT INTO products
+           (categoryDetailId, slug, name, sku, summary, description, image,
+            gallery, specs, videoUrl, price, salePrice, launchedAt, status,
+            inStock, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
           dto.categoryDetailId,
-          this.resolveSlug(dto.slug, dto.name),
+          await this.resolveSlug(dto.slug, dto.name),
           dto.name,
           sku,
           dto.summary ?? null,
@@ -307,18 +306,19 @@ export class ProductsService {
           (dto.inStock ?? true) ? 1 : 0,
           now,
           now,
-        );
+        ],
+      );
 
-      return this.findOneOrFail(Number(result.lastInsertRowid));
+      return this.findOneOrFail(result.lastInsertId);
     });
   }
 
-  update(id: number, dto: UpdateProductDto): Product {
-    return this.sqlite.transaction(() => {
-      const current = this.findOneOrFail(id);
+  async update(id: number, dto: UpdateProductDto): Promise<Product> {
+    return this.db.transaction(async () => {
+      const current = await this.findOneOrFail(id);
 
       if (dto.categoryDetailId !== undefined) {
-        this.assertCategory(dto.categoryDetailId);
+        await this.assertCategory(dto.categoryDetailId);
       }
 
       // `undefined` = không gửi → giữ nguyên; `null` = xoá giá.
@@ -328,23 +328,21 @@ export class ProductsService {
       this.assertPrices(price, salePrice);
 
       const sku = dto.sku !== undefined ? dto.sku : current.sku;
-      this.assertSkuFree(sku, id);
+      await this.assertSkuFree(sku, id);
 
       const slug =
         dto.slug === undefined
           ? current.slug
-          : this.resolveSlug(dto.slug, dto.name ?? current.name, id);
+          : await this.resolveSlug(dto.slug, dto.name ?? current.name, id);
 
-      this.sqlite.db
-        .prepare(
-          `UPDATE products
-              SET categoryDetailId = ?, slug = ?, name = ?, sku = ?,
-                  summary = ?, description = ?, image = ?, gallery = ?,
-                  specs = ?, videoUrl = ?, price = ?, salePrice = ?, launchedAt = ?, status = ?,
-                  inStock = ?, updatedAt = ?
-            WHERE id = ?`,
-        )
-        .run(
+      await this.db.run(
+        `UPDATE products
+            SET categoryDetailId = ?, slug = ?, name = ?, sku = ?,
+                summary = ?, description = ?, image = ?, gallery = ?,
+                specs = ?, videoUrl = ?, price = ?, salePrice = ?, launchedAt = ?, status = ?,
+                inStock = ?, updatedAt = ?
+          WHERE id = ?`,
+        [
           dto.categoryDetailId ?? current.categoryDetailId,
           slug,
           dto.name ?? current.name,
@@ -366,27 +364,26 @@ export class ProductsService {
           (dto.inStock ?? current.inStock) ? 1 : 0,
           new Date().toISOString(),
           id,
-        );
+        ],
+      );
 
       return this.findOneOrFail(id);
     });
   }
 
-  remove(id: number): void {
-    this.findOneOrFail(id);
-    this.sqlite.db.prepare('DELETE FROM products WHERE id = ?').run(id);
+  async remove(id: number): Promise<void> {
+    await this.findOneOrFail(id);
+    await this.db.run('DELETE FROM products WHERE id = ?', [id]);
   }
 
   /** Số sản phẩm theo từng lĩnh vực, cho bộ lọc ở trang ngoài. */
-  countsByCategory(onlyLive = false): Record<number, number> {
-    const rows = this.sqlite.db
-      .prepare(
-        `SELECT categoryDetailId AS id, COUNT(*) AS total
-           FROM products
-          ${onlyLive ? "WHERE status = 'published'" : ''}
-          GROUP BY categoryDetailId`,
-      )
-      .all() as { id: number | bigint; total: number | bigint }[];
+  async countsByCategory(onlyLive = false): Promise<Record<number, number>> {
+    const rows = await this.db.all<{ id: number; total: number }>(
+      `SELECT categoryDetailId AS id, COUNT(*) AS total
+         FROM products
+        ${onlyLive ? "WHERE status = 'published'" : ''}
+        GROUP BY categoryDetailId`,
+    );
 
     return Object.fromEntries(
       rows.map((row) => [Number(row.id), Number(row.total)]),
@@ -411,11 +408,16 @@ export class ProductsService {
     }
   }
 
-  private assertSkuFree(sku: string | null, selfId?: number): void {
+  /** So mã không phân biệt hoa thường (collation mặc định utf8mb4_unicode_ci). */
+  private async assertSkuFree(
+    sku: string | null,
+    selfId?: number,
+  ): Promise<void> {
     if (sku === null) return;
-    const clash = this.sqlite.db
-      .prepare('SELECT id FROM products WHERE sku = ? COLLATE NOCASE')
-      .get(sku) as { id: number | bigint } | undefined;
+    const clash = await this.db.get<{ id: number }>(
+      'SELECT id FROM products WHERE sku = ?',
+      [sku],
+    );
 
     if (clash && Number(clash.id) !== selfId) {
       throw new ConflictException(`Mã sản phẩm "${sku}" đã được dùng`);
@@ -431,19 +433,17 @@ export class ProductsService {
 
   /**
    * Lĩnh vực phải là chi tiết đang bật của đúng danh mục `DM_LINH_VUC_SP`.
-   * Truy vấn thẳng bảng thay vì phụ thuộc CategoriesModule — cùng một kết nối
-   * SQLite, và tránh vòng phụ thuộc giữa hai module.
+   * Truy vấn thẳng bảng thay vì phụ thuộc CategoriesModule — cùng một
+   * database, và tránh vòng phụ thuộc giữa hai module.
    */
-  private assertCategory(categoryDetailId: number): void {
-    const row = this.sqlite.db
-      .prepare(
-        `SELECT d.status AS status
-           FROM category_details d
-           JOIN categories c ON c.id = d.categoryId
-          WHERE d.id = ? AND c.code = ?`,
-      )
-      .get(categoryDetailId, PRODUCT_CATEGORY_CODE) as
-      { status: string } | undefined;
+  private async assertCategory(categoryDetailId: number): Promise<void> {
+    const row = await this.db.get<{ status: string }>(
+      `SELECT d.status AS status
+         FROM category_details d
+         JOIN categories c ON c.id = d.categoryId
+        WHERE d.id = ? AND c.code = ?`,
+      [categoryDetailId, PRODUCT_CATEGORY_CODE],
+    );
 
     if (!row) {
       throw new BadRequestException(
@@ -458,19 +458,20 @@ export class ProductsService {
   }
 
   /** Slug duy nhất: trùng thì thêm hậu tố -2, -3… */
-  private resolveSlug(
+  private async resolveSlug(
     requested: string | undefined,
     name: string,
     selfId?: number,
-  ): string {
+  ): Promise<string> {
     const base =
       (requested && slugify(requested)) || slugify(name) || 'san-pham';
 
     for (let suffix = 1; ; suffix += 1) {
       const candidate = suffix === 1 ? base : `${base}-${suffix}`;
-      const clash = this.sqlite.db
-        .prepare('SELECT id FROM products WHERE slug = ?')
-        .get(candidate) as { id: number | bigint } | undefined;
+      const clash = await this.db.get<{ id: number }>(
+        'SELECT id FROM products WHERE slug = ?',
+        [candidate],
+      );
 
       if (!clash || (selfId !== undefined && Number(clash.id) === selfId)) {
         return candidate;

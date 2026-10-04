@@ -5,9 +5,8 @@
  *   npm run set-role -- ban@gmail.com admin
  *   npm run set-role -- ban@gmail.com user
  */
-import { DatabaseSync } from 'node:sqlite';
+import mysql from 'mysql2/promise';
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
 
 const [email, role = 'admin'] = process.argv.slice(2);
 
@@ -16,35 +15,58 @@ if (!email || !['admin', 'user'].includes(role)) {
   process.exit(1);
 }
 
-/** Đọc DATABASE_FILE từ .env.local mà không cần thêm dependency. */
-function databaseFile() {
+/**
+ * Đọc các biến `DB_*` từ .env.local rồi .env mà không cần thêm dependency.
+ * File đứng trước được ưu tiên; biến môi trường thật ưu tiên hơn cả.
+ */
+function readEnv() {
+  const env = {};
   for (const name of ['.env.local', '.env']) {
     try {
-      const line = readFileSync(name, 'utf8')
-        .split('\n')
-        .find((l) => l.trim().startsWith('DATABASE_FILE='));
-      if (line) return line.split('=').slice(1).join('=').trim();
+      for (const raw of readFileSync(name, 'utf8').split('\n')) {
+        const line = raw.trim();
+        if (!line || line.startsWith('#') || !line.includes('=')) continue;
+        const key = line.slice(0, line.indexOf('=')).trim();
+        let value = line.slice(line.indexOf('=') + 1).trim();
+        if (/^(['"]).*\1$/.test(value)) value = value.slice(1, -1);
+        if (!(key in env)) env[key] = value;
+      }
     } catch {
       // file không tồn tại thì thử file kế tiếp
     }
   }
-  return 'data/app.db';
+  return { ...env, ...process.env };
 }
 
-const file = path.resolve(process.cwd(), databaseFile());
-const db = new DatabaseSync(file);
-// Script này thường chạy lúc server vẫn đang bật. Mặc định `node:sqlite` không
-// chờ chút nào nên sẽ ném "database is locked" ngay nếu server đang ghi.
-db.exec('PRAGMA busy_timeout = 5000');
-const user = db.prepare('SELECT id, email, role FROM users WHERE email = ?').get(email);
+const env = readEnv();
+const database = env.DB_NAME || 'business-platform';
+const host = env.DB_HOST || '127.0.0.1';
+const port = Number(env.DB_PORT || 3306);
 
-if (!user) {
-  console.error(`Không tìm thấy ${email} trong ${file}.`);
-  console.error('Hãy đăng nhập bằng Google một lần trước để tạo bản ghi.');
-  process.exit(1);
+const db = await mysql.createConnection({
+  host,
+  port,
+  user: env.DB_USER || 'root',
+  password: env.DB_PASSWORD ?? '',
+  database,
+  charset: 'utf8mb4',
+});
+
+try {
+  const [rows] = await db.query(
+    'SELECT id, email, role FROM users WHERE email = ?',
+    [email],
+  );
+  const user = rows[0];
+
+  if (!user) {
+    console.error(`Không tìm thấy ${email} trong ${host}:${port}/${database}.`);
+    console.error('Hãy đăng nhập bằng Google một lần trước để tạo bản ghi.');
+    process.exitCode = 1;
+  } else {
+    await db.query('UPDATE users SET role = ? WHERE id = ?', [role, user.id]);
+    console.log(`${email}: role ${user.role} -> ${role}`);
+  }
+} finally {
+  await db.end();
 }
-
-db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, user.id);
-db.close();
-
-console.log(`${email}: role ${user.role} -> ${role}`);

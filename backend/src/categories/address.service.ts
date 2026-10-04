@@ -23,53 +23,60 @@ export class AddressService {
     private readonly details: CategoryDetailsService,
   ) {}
 
-  private categoryIdByCode(code: string): number | null {
-    return this.categories.list().find((c) => c.code === code)?.id ?? null;
+  private async categoryIdByCode(code: string): Promise<number | null> {
+    const categories = await this.categories.list();
+    return categories.find((c) => c.code === code)?.id ?? null;
   }
 
-  listProvinces(): AddressOption[] {
-    const categoryId = this.categoryIdByCode(PROVINCE_CATEGORY_CODE);
+  async listProvinces(): Promise<AddressOption[]> {
+    const categoryId = await this.categoryIdByCode(PROVINCE_CATEGORY_CODE);
     if (categoryId === null) return [];
 
-    return this.details
-      .list(categoryId, { status: 'active' })
-      .map((detail) => ({ code: detail.code, name: detail.name }));
+    const details = await this.details.list(categoryId, { status: 'active' });
+    return details.map((detail) => ({ code: detail.code, name: detail.name }));
   }
 
   /** Phường/xã của một tỉnh; tỉnh không tồn tại thì trả mảng rỗng. */
-  listWards(provinceCode: string): AddressOption[] {
-    const wardCategoryId = this.categoryIdByCode(WARD_CATEGORY_CODE);
-    const province = this.findProvinceDetail(provinceCode);
+  async listWards(provinceCode: string): Promise<AddressOption[]> {
+    const wardCategoryId = await this.categoryIdByCode(WARD_CATEGORY_CODE);
+    const province = await this.findProvinceDetail(provinceCode);
     if (wardCategoryId === null || province === null) return [];
 
-    return this.details
-      .list(wardCategoryId, { status: 'active', groupDetailId: province.id })
-      .map((detail) => ({ code: detail.code, name: detail.name }));
+    const details = await this.details.list(wardCategoryId, {
+      status: 'active',
+      groupDetailId: province.id,
+    });
+    return details.map((detail) => ({ code: detail.code, name: detail.name }));
   }
 
-  private findProvinceDetail(code: string): { id: number } | null {
-    const categoryId = this.categoryIdByCode(PROVINCE_CATEGORY_CODE);
+  private async findProvinceDetail(
+    code: string,
+  ): Promise<{ id: number } | null> {
+    const categoryId = await this.categoryIdByCode(PROVINCE_CATEGORY_CODE);
     if (categoryId === null) return null;
 
-    return (
-      this.details.list(categoryId).find((detail) => detail.code === code) ??
-      null
-    );
+    const details = await this.details.list(categoryId);
+    return details.find((detail) => detail.code === code) ?? null;
   }
 
   /**
    * Chặn địa chỉ bịa: mã tỉnh phải có thật và phường phải thuộc đúng tỉnh đó.
    * Form chỉ đưa lựa chọn hợp lệ, nhưng request tự chế thì không.
    */
-  assertValidAddress(provinceCode: string, wardCode: string): void {
-    const province = this.listProvinces().find((p) => p.code === provinceCode);
+  async assertValidAddress(
+    provinceCode: string,
+    wardCode: string,
+  ): Promise<void> {
+    const provinces = await this.listProvinces();
+    const province = provinces.find((p) => p.code === provinceCode);
     if (!province) {
       throw new BadRequestException(
         `Không tìm thấy tỉnh/thành phố có mã "${provinceCode}"`,
       );
     }
 
-    const ward = this.listWards(provinceCode).find((w) => w.code === wardCode);
+    const wards = await this.listWards(provinceCode);
+    const ward = wards.find((w) => w.code === wardCode);
     if (!ward) {
       throw new BadRequestException(
         `Phường/xã "${wardCode}" không thuộc ${province.name}`,
@@ -78,18 +85,21 @@ export class AddressService {
   }
 
   /** Dạng hiển thị đầy đủ, dùng cho trang admin và trang cá nhân. */
-  describe(
+  async describe(
     provinceCode: string | null,
     wardCode: string | null,
-  ): { province: string | null; ward: string | null } {
+  ): Promise<{ province: string | null; ward: string | null }> {
     if (!provinceCode) return { province: null, ward: null };
 
+    const provinces = await this.listProvinces();
     const province =
-      this.listProvinces().find((p) => p.code === provinceCode)?.name ?? null;
-    const ward = wardCode
-      ? (this.listWards(provinceCode).find((w) => w.code === wardCode)?.name ??
-        null)
-      : null;
+      provinces.find((p) => p.code === provinceCode)?.name ?? null;
+
+    let ward: string | null = null;
+    if (wardCode) {
+      const wards = await this.listWards(provinceCode);
+      ward = wards.find((w) => w.code === wardCode)?.name ?? null;
+    }
 
     return { province, ward };
   }

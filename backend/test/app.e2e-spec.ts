@@ -1,13 +1,12 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
+import { rmSync } from 'node:fs';
 import request from 'supertest';
 import { App } from 'supertest/types';
 
 import { AppModule } from './../src/app.module';
 import { createValidationPipe } from './../src/common/validation';
+import { testDatabaseConfig } from '../src/database/testing';
 
 const API_KEY = 'test-api-key';
 
@@ -47,11 +46,12 @@ describe('API (e2e)', () => {
   };
 
   let app: INestApplication<App>;
-  let tempDir: string;
+  let dbEnv: Record<string, string>;
 
   beforeEach(async () => {
-    tempDir = mkdtempSync(path.join(tmpdir(), 'nest-e2e-'));
-    process.env.DATABASE_FILE = path.join(tempDir, 'e2e.db');
+    // Database MySQL riêng cho từng test, tự xoá khi app đóng.
+    dbEnv = testDatabaseConfig();
+    Object.assign(process.env, dbEnv);
     process.env.BACKEND_API_KEY = API_KEY;
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -67,8 +67,8 @@ describe('API (e2e)', () => {
 
   afterEach(async () => {
     await app.close();
-    rmSync(tempDir, { recursive: true, force: true });
-    delete process.env.DATABASE_FILE;
+    rmSync(dbEnv.UPLOAD_DIR, { recursive: true, force: true });
+    for (const key of Object.keys(dbEnv)) delete process.env[key];
     delete process.env.BACKEND_API_KEY;
   });
 

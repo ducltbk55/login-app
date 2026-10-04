@@ -16,7 +16,7 @@ npm-debug.log*
 .env*
 !.env.example
 
-# database (SQLite)
+# dữ liệu cục bộ: tệp upload, file SQLite cũ
 /data
 
 # IDE

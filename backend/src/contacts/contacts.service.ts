@@ -1,10 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
+import { rmSync, writeFileSync } from 'node:fs';
 
 import { matchesSearch } from '../common/search';
-import { SqliteService } from '../database/sqlite.service';
+import { uploadDir } from '../common/upload-dir';
+import { DatabaseService } from '../database/database.service';
 import {
   isInlineSafe,
   resolveInsideDir,
@@ -17,7 +17,7 @@ import { ListContactsDto } from './dto/list-contacts.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 
 type ContactRow = {
-  id: number | bigint;
+  id: number;
   name: string;
   email: string;
   phone: string | null;
@@ -26,7 +26,7 @@ type ContactRow = {
   attachmentName: string | null;
   attachmentFile: string | null;
   attachmentMime: string | null;
-  attachmentSize: number | bigint | null;
+  attachmentSize: number | null;
   status: string;
   note: string | null;
   handledBy: string | null;
@@ -74,29 +74,20 @@ export class ContactsService {
   private readonly logger = new Logger(ContactsService.name);
 
   constructor(
-    private readonly sqlite: SqliteService,
+    private readonly db: DatabaseService,
     private readonly config: ConfigService,
   ) {}
 
   /**
-   * Tệp nằm cạnh file DB (`data/uploads/contacts`), không nằm trong thư mục
-   * tĩnh nào: đính kèm có thể chứa thông tin riêng của khách, chỉ admin đã
-   * đăng nhập mới được đọc qua endpoint có kiểm soát.
-   *
-   * Đặt cạnh DB cũng có nghĩa là sao lưu thư mục `data/` là có đủ cả hai.
+   * Tệp nằm trong `UPLOAD_DIR/contacts` (mặc định `data/uploads/contacts`),
+   * không nằm trong thư mục tĩnh nào: đính kèm có thể chứa thông tin riêng
+   * của khách, chỉ admin đã đăng nhập mới được đọc qua endpoint có kiểm soát.
    */
   private uploadDir(): string {
-    const file = this.config.get<string>('DATABASE_FILE') ?? 'data/app.db';
-    const absolute = path.isAbsolute(file)
-      ? file
-      : path.join(process.cwd(), file);
-
-    const dir = path.join(path.dirname(absolute), 'uploads', 'contacts');
-    mkdirSync(dir, { recursive: true });
-    return dir;
+    return uploadDir(this.config, 'contacts');
   }
 
-  list(query: ListContactsDto = {}): Contact[] {
+  async list(query: ListContactsDto = {}): Promise<Contact[]> {
     const where: string[] = [];
     const params: string[] = [];
 
@@ -105,13 +96,12 @@ export class ContactsService {
       params.push(query.status);
     }
 
-    const rows = this.sqlite.db
-      .prepare(
-        `SELECT * FROM contacts
-         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-         ORDER BY createdAt DESC, id DESC`,
-      )
-      .all(...params) as ContactRow[];
+    const rows = await this.db.all<ContactRow>(
+      `SELECT * FROM contacts
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       ORDER BY createdAt DESC, id DESC`,
+      params,
+    );
 
     const items = rows.map(toContact);
     if (!query.search) return items;
@@ -127,25 +117,26 @@ export class ContactsService {
     );
   }
 
-  findOne(id: number): Contact | null {
-    const row = this.sqlite.db
-      .prepare('SELECT * FROM contacts WHERE id = ?')
-      .get(id) as ContactRow | undefined;
+  async findOne(id: number): Promise<Contact | null> {
+    const row = await this.db.get<ContactRow>(
+      'SELECT * FROM contacts WHERE id = ?',
+      [id],
+    );
     return row ? toContact(row) : null;
   }
 
-  findOneOrFail(id: number): Contact {
-    const contact = this.findOne(id);
+  async findOneOrFail(id: number): Promise<Contact> {
+    const contact = await this.findOne(id);
     if (!contact) {
       throw new NotFoundException(`Không tìm thấy liên hệ ${id}`);
     }
     return contact;
   }
 
-  stats(): ContactStats {
-    const rows = this.sqlite.db
-      .prepare('SELECT status, COUNT(*) AS total FROM contacts GROUP BY status')
-      .all() as { status: string; total: number | bigint }[];
+  async stats(): Promise<ContactStats> {
+    const rows = await this.db.all<{ status: string; total: number }>(
+      'SELECT status, COUNT(*) AS total FROM contacts GROUP BY status',
+    );
 
     const by = (status: ContactStatus) =>
       Number(rows.find((row) => row.status === status)?.total ?? 0);
@@ -158,7 +149,10 @@ export class ContactsService {
     };
   }
 
-  create(dto: CreateContactDto, file?: UploadedAttachment): Contact {
+  async create(
+    dto: CreateContactDto,
+    file?: UploadedAttachment,
+  ): Promise<Contact> {
     const now = new Date().toISOString();
 
     // Ghi file TRƯỚC khi insert: nếu ghi hỏng thì chưa có bản ghi nào trỏ tới
@@ -170,15 +164,13 @@ export class ContactsService {
     }
 
     try {
-      const result = this.sqlite.db
-        .prepare(
-          `INSERT INTO contacts
-             (name, email, phone, subject, message,
-              attachmentName, attachmentFile, attachmentMime, attachmentSize,
-              status, note, handledBy, handledAt, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', NULL, NULL, NULL, ?, ?)`,
-        )
-        .run(
+      const result = await this.db.run(
+        `INSERT INTO contacts
+           (name, email, phone, subject, message,
+            attachmentName, attachmentFile, attachmentMime, attachmentSize,
+            status, note, handledBy, handledAt, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', NULL, NULL, NULL, ?, ?)`,
+        [
           dto.name,
           dto.email,
           dto.phone ?? null,
@@ -190,9 +182,10 @@ export class ContactsService {
           file ? file.size : null,
           now,
           now,
-        );
+        ],
+      );
 
-      return this.findOneOrFail(Number(result.lastInsertRowid));
+      return await this.findOneOrFail(result.lastInsertId);
     } catch (error) {
       // Insert hỏng thì tệp vừa ghi thành rác, xoá ngay cho sạch.
       if (fileName) this.removeFile(fileName);
@@ -200,8 +193,8 @@ export class ContactsService {
     }
   }
 
-  update(id: number, dto: UpdateContactDto): Contact {
-    const current = this.findOneOrFail(id);
+  async update(id: number, dto: UpdateContactDto): Promise<Contact> {
+    const current = await this.findOneOrFail(id);
     const now = new Date().toISOString();
     const status = dto.status ?? current.status;
 
@@ -219,31 +212,31 @@ export class ContactsService {
         : (dto.handledBy ?? current.handledBy)
       : current.handledBy;
 
-    this.sqlite.db
-      .prepare(
-        `UPDATE contacts
-            SET status = ?, note = ?, handledBy = ?, handledAt = ?, updatedAt = ?
-          WHERE id = ?`,
-      )
-      .run(
+    await this.db.run(
+      `UPDATE contacts
+          SET status = ?, note = ?, handledBy = ?, handledAt = ?, updatedAt = ?
+        WHERE id = ?`,
+      [
         status,
         dto.note !== undefined ? dto.note : current.note,
         handledBy,
         handledAt,
         now,
         id,
-      );
+      ],
+    );
 
     return this.findOneOrFail(id);
   }
 
-  remove(id: number): void {
-    const contact = this.findOneOrFail(id);
-    const row = this.sqlite.db
-      .prepare('SELECT attachmentFile FROM contacts WHERE id = ?')
-      .get(id) as { attachmentFile: string | null } | undefined;
+  async remove(id: number): Promise<void> {
+    const contact = await this.findOneOrFail(id);
+    const row = await this.db.get<{ attachmentFile: string | null }>(
+      'SELECT attachmentFile FROM contacts WHERE id = ?',
+      [id],
+    );
 
-    this.sqlite.db.prepare('DELETE FROM contacts WHERE id = ?').run(id);
+    await this.db.run('DELETE FROM contacts WHERE id = ?', [id]);
 
     // Xoá bản ghi rồi mới xoá tệp: còn tệp mồ côi thì vô hại, còn bản ghi trỏ
     // tới tệp đã mất thì admin bấm xem sẽ gặp lỗi.
@@ -252,18 +245,17 @@ export class ContactsService {
   }
 
   /** Đường dẫn tuyệt đối tới tệp đính kèm, để controller stream về. */
-  attachmentPath(id: number): { path: string; name: string; mime: string } {
-    const row = this.sqlite.db
-      .prepare(
-        'SELECT attachmentFile, attachmentName, attachmentMime FROM contacts WHERE id = ?',
-      )
-      .get(id) as
-      | {
-          attachmentFile: string | null;
-          attachmentName: string | null;
-          attachmentMime: string | null;
-        }
-      | undefined;
+  async attachmentPath(
+    id: number,
+  ): Promise<{ path: string; name: string; mime: string }> {
+    const row = await this.db.get<{
+      attachmentFile: string | null;
+      attachmentName: string | null;
+      attachmentMime: string | null;
+    }>(
+      'SELECT attachmentFile, attachmentName, attachmentMime FROM contacts WHERE id = ?',
+      [id],
+    );
 
     if (!row) throw new NotFoundException(`Không tìm thấy liên hệ ${id}`);
     if (!row.attachmentFile || !row.attachmentMime) {

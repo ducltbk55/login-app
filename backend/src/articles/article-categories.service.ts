@@ -25,37 +25,40 @@ export class ArticleCategoriesService implements OnModuleInit {
     private readonly details: CategoryDetailsService,
   ) {}
 
-  onModuleInit(): void {
-    this.ensureSeeded();
+  async onModuleInit(): Promise<void> {
+    await this.ensureSeeded();
   }
 
   /** Public và idempotent — Nest không đảm bảo thứ tự onModuleInit. */
-  ensureSeeded(): void {
-    const category = this.ensureCategory();
+  async ensureSeeded(): Promise<void> {
+    const category = await this.ensureCategory();
 
     const existing = new Map(
-      this.details.list(category.id).map((detail) => [detail.code, detail]),
+      (await this.details.list(category.id)).map((detail) => [
+        detail.code,
+        detail,
+      ]),
     );
 
     let added = 0;
-    ARTICLE_CATEGORY_SEEDS.forEach((seed, index) => {
+    for (const [index, seed] of ARTICLE_CATEGORY_SEEDS.entries()) {
       const order = index + 1; // thứ tự hiển thị đánh số từ 1
       const current = existing.get(seed.code);
 
       if (!current) {
-        this.details.create(category.id, {
+        await this.details.create(category.id, {
           code: seed.code,
           name: seed.name,
           order,
         });
         added += 1;
-        return;
+        continue;
       }
 
       if (current.order !== order) {
-        this.details.update(category.id, current.id, { order });
+        await this.details.update(category.id, current.id, { order });
       }
-    });
+    }
 
     if (added > 0) {
       this.logger.log(`Đã thêm ${added} chuyên mục mặc định`);
@@ -63,22 +66,23 @@ export class ArticleCategoriesService implements OnModuleInit {
   }
 
   /** Danh mục chuyên mục; dùng cho chỗ cần biết id của nó. */
-  category(): Category | null {
+  async category(): Promise<Category | null> {
     return (
-      this.categories.list().find((c) => c.code === ARTICLE_CATEGORY_CODE) ??
-      null
+      (await this.categories.list()).find(
+        (c) => c.code === ARTICLE_CATEGORY_CODE,
+      ) ?? null
     );
   }
 
   /** Các chuyên mục đang bật, theo đúng thứ tự hiển thị của danh mục. */
-  list(): CategoryDetail[] {
-    const category = this.category();
+  async list(): Promise<CategoryDetail[]> {
+    const category = await this.category();
     if (!category) return [];
     return this.details.list(category.id, { status: 'active' });
   }
 
-  private ensureCategory(): Category {
-    const found = this.category();
+  private async ensureCategory(): Promise<Category> {
+    const found = await this.category();
     if (found) return found;
 
     this.logger.log(`Tạo danh mục "${ARTICLE_CATEGORY_NAME}"`);

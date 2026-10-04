@@ -29,7 +29,7 @@ import {
   sortProvinces,
   sortWards,
 } from '../src/categories/vn-administrative-order';
-import { SqliteService } from '../src/database/sqlite.service';
+import { DatabaseService } from '../src/database/database.service';
 
 const PROVINCE_CATEGORY_CODE = 'DM_TINH_TP';
 const PROVINCE_CATEGORY_NAME = 'Tỉnh, Thành phố';
@@ -50,11 +50,7 @@ type Dataset = {
 };
 
 function loadDataset(): Dataset {
-  const file = path.join(
-    __dirname,
-    'data',
-    'vn-administrative-units.json',
-  );
+  const file = path.join(__dirname, 'data', 'vn-administrative-units.json');
   const dataset = JSON.parse(readFileSync(file, 'utf8')) as Dataset;
 
   const wards = dataset.provinces.reduce((n, p) => n + p.wards.length, 0);
@@ -80,22 +76,25 @@ async function main(): Promise<void> {
     logger: ['warn', 'error'],
   });
 
-  const sqlite = app.get(SqliteService);
+  const db = app.get(DatabaseService);
   const categories = app.get(CategoriesService);
   const details = app.get(CategoryDetailsService);
 
-  const findByCode = (code: string): Category | null =>
-    categories.list().find((c) => c.code === code) ?? null;
+  const findByCode = async (code: string): Promise<Category | null> =>
+    (await categories.list()).find((c) => c.code === code) ?? null;
 
   /**
    * Script dò danh mục theo mã, nên nếu ai đó đổi mã trong giao diện thì lần
    * chạy sau sẽ lặng lẽ tạo một danh mục thứ hai trùng tên. Dừng lại và nói rõ
    * thay vì để dữ liệu nhân đôi.
    */
-  const assertNoRenamedTwin = (code: string, name: string): void => {
-    if (findByCode(code)) return;
+  const assertNoRenamedTwin = async (
+    code: string,
+    name: string,
+  ): Promise<void> => {
+    if (await findByCode(code)) return;
 
-    const twin = categories.list().find((c) => c.name === name);
+    const twin = (await categories.list()).find((c) => c.name === name);
     if (twin) {
       throw new Error(
         `Đã có danh mục tên "${name}" nhưng mã là "${twin.code}", không phải ` +
@@ -106,24 +105,27 @@ async function main(): Promise<void> {
   };
 
   try {
-    // Cả lượt nạp nằm trong một transaction: nhanh hơn hẳn vài nghìn lần ghi
-    // lẻ, và nếu lỗi giữa chừng thì DB quay về nguyên trạng.
-    assertNoRenamedTwin(PROVINCE_CATEGORY_CODE, PROVINCE_CATEGORY_NAME);
-    assertNoRenamedTwin(WARD_CATEGORY_CODE, WARD_CATEGORY_NAME);
+    await assertNoRenamedTwin(PROVINCE_CATEGORY_CODE, PROVINCE_CATEGORY_NAME);
+    await assertNoRenamedTwin(WARD_CATEGORY_CODE, WARD_CATEGORY_NAME);
 
-    const report = sqlite.transaction(() => {
+    // Cả lượt nạp nằm trong một transaction MySQL: vài nghìn lần ghi chỉ
+    // COMMIT một lần nên nhanh hơn hẳn autocommit từng câu, và nếu lỗi giữa
+    // chừng thì DB quay về nguyên trạng. Các service gọi bên trong tự dùng
+    // chung kết nối của transaction (DatabaseService theo dõi qua
+    // AsyncLocalStorage).
+    const report = await db.transaction(async () => {
       const provinceCategory =
-        findByCode(PROVINCE_CATEGORY_CODE) ??
-        categories.create({
+        (await findByCode(PROVINCE_CATEGORY_CODE)) ??
+        (await categories.create({
           code: PROVINCE_CATEGORY_CODE,
           name: PROVINCE_CATEGORY_NAME,
           descriptions:
             'Đơn vị hành chính cấp tỉnh của Việt Nam. ' + dataset.note,
-        });
+        }));
 
-      let wardCategory = findByCode(WARD_CATEGORY_CODE);
+      let wardCategory = await findByCode(WARD_CATEGORY_CODE);
       if (!wardCategory) {
-        wardCategory = categories.create({
+        wardCategory = await categories.create({
           code: WARD_CATEGORY_CODE,
           name: WARD_CATEGORY_NAME,
           descriptions:
@@ -131,16 +133,17 @@ async function main(): Promise<void> {
           groupCategoryId: provinceCategory.id,
         });
       } else if (wardCategory.groupCategoryId !== provinceCategory.id) {
-        wardCategory = categories.update(wardCategory.id, {
+        wardCategory = await categories.update(wardCategory.id, {
           groupCategoryId: provinceCategory.id,
         });
       }
+      const wardCategoryId = wardCategory.id;
 
       const existingProvinces = new Map(
-        details.list(provinceCategory.id).map((d) => [d.code, d]),
+        (await details.list(provinceCategory.id)).map((d) => [d.code, d]),
       );
       const existingWards = new Map(
-        details.list(wardCategory.id).map((d) => [d.code, d]),
+        (await details.list(wardCategoryId)).map((d) => [d.code, d]),
       );
 
       let addedProvinces = 0;
@@ -151,53 +154,61 @@ async function main(): Promise<void> {
       const orderOf = (index: number) => index + 1;
 
       /** Ghi `order` mới cho bản ghi đã có, nếu nó đang lệch. */
-      const syncOrder = (
+      const syncOrder = async (
         categoryId: number,
         current: { id: number; order: number },
         order: number,
-      ) => {
+      ): Promise<void> => {
         if (current.order === order) return;
-        details.update(categoryId, current.id, { order });
+        await details.update(categoryId, current.id, { order });
         reordered += 1;
       };
 
-      sortProvinces(dataset.provinces).forEach((province, provinceIndex) => {
+      for (const [provinceIndex, province] of sortProvinces(
+        dataset.provinces,
+      ).entries()) {
         const existing = existingProvinces.get(province.code);
         let provinceDetailId: number;
 
         if (existing) {
           provinceDetailId = existing.id;
-          syncOrder(provinceCategory.id, existing, orderOf(provinceIndex));
+          await syncOrder(
+            provinceCategory.id,
+            existing,
+            orderOf(provinceIndex),
+          );
         } else {
-          provinceDetailId = details.create(provinceCategory.id, {
-            code: province.code,
-            name: province.name,
-            order: orderOf(provinceIndex),
-          }).id;
+          provinceDetailId = (
+            await details.create(provinceCategory.id, {
+              code: province.code,
+              name: province.name,
+              order: orderOf(provinceIndex),
+            })
+          ).id;
           addedProvinces += 1;
         }
 
-        sortWards(province.wards).forEach((ward, wardIndex) => {
+        for (const [wardIndex, ward] of sortWards(province.wards).entries()) {
           const current = existingWards.get(ward.code);
 
           if (current) {
-            syncOrder(wardCategory!.id, current, orderOf(wardIndex));
-            return;
+            await syncOrder(wardCategoryId, current, orderOf(wardIndex));
+            continue;
           }
 
-          details.create(wardCategory!.id, {
+          await details.create(wardCategoryId, {
             code: ward.code,
             name: ward.name,
             order: orderOf(wardIndex),
             groupDetailId: provinceDetailId,
           });
           addedWards += 1;
-        });
-      });
+        }
+      }
 
       return {
         provinceCategoryId: provinceCategory.id,
-        wardCategoryId: wardCategory.id,
+        wardCategoryId,
         addedProvinces,
         addedWards,
         reordered,
@@ -205,8 +216,9 @@ async function main(): Promise<void> {
     });
 
     // Đọc lại từ DB để báo cáo con số thật, không phải con số vừa đếm.
-    const provinceTotal = details.list(report.provinceCategoryId).length;
-    const wardTotal = details.list(report.wardCategoryId).length;
+    const provinceTotal = (await details.list(report.provinceCategoryId))
+      .length;
+    const wardTotal = (await details.list(report.wardCategoryId)).length;
 
     console.log(
       `Thêm mới: ${report.addedProvinces} tỉnh/thành, ${report.addedWards} phường/xã.\n` +

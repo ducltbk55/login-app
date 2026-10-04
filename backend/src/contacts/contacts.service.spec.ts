@@ -1,16 +1,10 @@
 import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  existsSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 import { DatabaseModule } from '../database/database.module';
+import { testDatabaseConfig } from '../database/testing';
 import {
   decodeUploadName,
   isAllowedMime,
@@ -23,10 +17,10 @@ import { ContactsService, type UploadedAttachment } from './contacts.service';
 
 describe('ContactsService', () => {
   let moduleRef: TestingModule;
-  let tempDir: string;
+  let config: Record<string, string>;
   let contacts: ContactsService;
 
-  const uploadDir = () => path.join(tempDir, 'uploads', 'contacts');
+  const uploadDir = () => path.join(config.UPLOAD_DIR, 'contacts');
 
   const form = (extra: Record<string, unknown> = {}) => ({
     name: 'Nguyễn Văn A',
@@ -46,14 +40,14 @@ describe('ContactsService', () => {
   });
 
   beforeEach(async () => {
-    tempDir = mkdtempSync(path.join(tmpdir(), 'nest-contacts-'));
+    config = testDatabaseConfig();
 
     moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
           ignoreEnvFile: true,
-          load: [() => ({ DATABASE_FILE: path.join(tempDir, 'test.db') })],
+          load: [() => config],
         }),
         DatabaseModule,
       ],
@@ -66,7 +60,7 @@ describe('ContactsService', () => {
 
   afterEach(async () => {
     await moduleRef.close();
-    rmSync(tempDir, { recursive: true, force: true });
+    rmSync(config.UPLOAD_DIR, { recursive: true, force: true });
   });
 
   describe('chính sách tệp đính kèm', () => {
@@ -136,8 +130,8 @@ describe('ContactsService', () => {
   });
 
   describe('gửi liên hệ', () => {
-    it('lưu được yêu cầu không kèm tệp', () => {
-      const contact = contacts.create(form());
+    it('lưu được yêu cầu không kèm tệp', async () => {
+      const contact = await contacts.create(form());
 
       expect(contact).toMatchObject({
         name: 'Nguyễn Văn A',
@@ -149,8 +143,8 @@ describe('ContactsService', () => {
       });
     });
 
-    it('ghi tệp xuống đĩa và lưu thông tin mô tả', () => {
-      const contact = contacts.create(form(), upload());
+    it('ghi tệp xuống đĩa và lưu thông tin mô tả', async () => {
+      const contact = await contacts.create(form(), upload());
 
       expect(contact.attachment).toMatchObject({
         name: 'ho-so.pdf',
@@ -166,8 +160,8 @@ describe('ContactsService', () => {
       expect(files[0]).toMatch(/\.pdf$/);
     });
 
-    it('tên tệp độc hại không chạm tới hệ thống tệp', () => {
-      const contact = contacts.create(
+    it('tên tệp độc hại không chạm tới hệ thống tệp', async () => {
+      const contact = await contacts.create(
         form(),
         upload({ originalname: '../../../app.db' }),
       );
@@ -176,38 +170,33 @@ describe('ContactsService', () => {
       expect(contact.attachment?.name).toBe('app.db');
       // ...và tên thật trên đĩa là uuid do mình sinh.
       expect(readdirSync(uploadDir())[0]).toMatch(/^[0-9a-f-]{36}\.pdf$/);
-      // File DB vẫn nguyên vẹn và không có gì bị ghi ra ngoài thư mục upload:
-      // thư mục gốc chỉ có file DB (kèm -wal/-shm) và thư mục uploads.
-      expect(existsSync(path.join(tempDir, 'test.db'))).toBe(true);
-      expect(
-        readdirSync(tempDir).filter(
-          (entry) => entry !== 'uploads' && !entry.startsWith('test.db'),
-        ),
-      ).toEqual([]);
+      // Không có gì bị ghi ra ngoài thư mục upload: gốc UPLOAD_DIR chỉ có
+      // thư mục `contacts`.
+      expect(readdirSync(config.UPLOAD_DIR)).toEqual(['contacts']);
     });
 
-    it('đọc lại được đúng nội dung tệp đã gửi', () => {
-      const contact = contacts.create(form(), upload());
-      const stored = contacts.attachmentPath(contact.id);
+    it('đọc lại được đúng nội dung tệp đã gửi', async () => {
+      const contact = await contacts.create(form(), upload());
+      const stored = await contacts.attachmentPath(contact.id);
 
       expect(readFileSync(stored.path).toString()).toContain('nội dung thử');
       expect(stored.name).toBe('ho-so.pdf');
       expect(stored.mime).toBe('application/pdf');
     });
 
-    it('liên hệ không có tệp thì báo 404 khi đòi tệp', () => {
-      const contact = contacts.create(form());
+    it('liên hệ không có tệp thì báo 404 khi đòi tệp', async () => {
+      const contact = await contacts.create(form());
 
-      expect(() => contacts.attachmentPath(contact.id)).toThrow(
+      await expect(contacts.attachmentPath(contact.id)).rejects.toThrow(
         /không có tệp đính kèm/,
       );
     });
   });
 
   describe('xử lý trong trang quản trị', () => {
-    it('đổi trạng thái thì ghi lại ai xử lý và lúc nào', () => {
-      const contact = contacts.create(form());
-      const updated = contacts.update(contact.id, {
+    it('đổi trạng thái thì ghi lại ai xử lý và lúc nào', async () => {
+      const contact = await contacts.create(form());
+      const updated = await contacts.update(contact.id, {
         status: 'resolved',
         handledBy: 'admin@uyvu.vn',
       });
@@ -217,42 +206,44 @@ describe('ContactsService', () => {
       expect(updated.handledAt).not.toBeNull();
     });
 
-    it('sửa ghi chú không làm đổi mốc đã xử lý', () => {
-      const contact = contacts.create(form());
-      const handled = contacts.update(contact.id, {
+    it('sửa ghi chú không làm đổi mốc đã xử lý', async () => {
+      const contact = await contacts.create(form());
+      const handled = await contacts.update(contact.id, {
         status: 'resolved',
         handledBy: 'admin@uyvu.vn',
       });
 
-      const noted = contacts.update(contact.id, { note: 'Đã gọi lại.' });
+      const noted = await contacts.update(contact.id, {
+        note: 'Đã gọi lại.',
+      });
 
       expect(noted.note).toBe('Đã gọi lại.');
       expect(noted.handledAt).toBe(handled.handledAt);
       expect(noted.handledBy).toBe('admin@uyvu.vn');
     });
 
-    it('trả về hàng đợi thì xoá dấu vết đã xử lý', () => {
-      const contact = contacts.create(form());
-      contacts.update(contact.id, {
+    it('trả về hàng đợi thì xoá dấu vết đã xử lý', async () => {
+      const contact = await contacts.create(form());
+      await contacts.update(contact.id, {
         status: 'resolved',
         handledBy: 'admin@uyvu.vn',
       });
 
-      const back = contacts.update(contact.id, { status: 'new' });
+      const back = await contacts.update(contact.id, { status: 'new' });
 
       expect(back.status).toBe('new');
       expect(back.handledAt).toBeNull();
       expect(back.handledBy).toBeNull();
     });
 
-    it('thống kê đếm theo từng trạng thái', () => {
-      contacts.create(form());
-      const b = contacts.create(form({ email: 'b@example.com' }));
-      const c = contacts.create(form({ email: 'c@example.com' }));
-      contacts.update(b.id, { status: 'in_progress' });
-      contacts.update(c.id, { status: 'resolved' });
+    it('thống kê đếm theo từng trạng thái', async () => {
+      await contacts.create(form());
+      const b = await contacts.create(form({ email: 'b@example.com' }));
+      const c = await contacts.create(form({ email: 'c@example.com' }));
+      await contacts.update(b.id, { status: 'in_progress' });
+      await contacts.update(c.id, { status: 'resolved' });
 
-      expect(contacts.stats()).toEqual({
+      expect(await contacts.stats()).toEqual({
         total: 3,
         pending: 1,
         inProgress: 1,
@@ -260,50 +251,54 @@ describe('ContactsService', () => {
       });
     });
 
-    it('lọc theo trạng thái', () => {
-      const a = contacts.create(form());
-      contacts.create(form({ email: 'b@example.com' }));
-      contacts.update(a.id, { status: 'rejected' });
+    it('lọc theo trạng thái', async () => {
+      const a = await contacts.create(form());
+      await contacts.create(form({ email: 'b@example.com' }));
+      await contacts.update(a.id, { status: 'rejected' });
 
-      expect(contacts.list({ status: 'rejected' })).toHaveLength(1);
-      expect(contacts.list({ status: 'new' })).toHaveLength(1);
+      expect(await contacts.list({ status: 'rejected' })).toHaveLength(1);
+      expect(await contacts.list({ status: 'new' })).toHaveLength(1);
     });
 
-    it('tìm kiếm bỏ dấu trên tên, email và nội dung', () => {
-      contacts.create(form({ name: 'Trần Thị Bích' }));
-      contacts.create(form({ email: 'khac@example.com', message: 'Hỏi giá' }));
+    it('tìm kiếm bỏ dấu trên tên, email và nội dung', async () => {
+      await contacts.create(form({ name: 'Trần Thị Bích' }));
+      await contacts.create(
+        form({ email: 'khac@example.com', message: 'Hỏi giá' }),
+      );
 
-      expect(contacts.list({ search: 'tran thi bich' })).toHaveLength(1);
-      expect(contacts.list({ search: 'hoi gia' })).toHaveLength(1);
-      expect(contacts.list({ search: 'khong-co-gi' })).toHaveLength(0);
+      expect(await contacts.list({ search: 'tran thi bich' })).toHaveLength(1);
+      expect(await contacts.list({ search: 'hoi gia' })).toHaveLength(1);
+      expect(await contacts.list({ search: 'khong-co-gi' })).toHaveLength(0);
     });
 
-    it('mới nhất lên đầu', () => {
-      contacts.create(form({ name: 'Cũ' }));
-      contacts.create(form({ name: 'Mới' }));
+    it('mới nhất lên đầu', async () => {
+      await contacts.create(form({ name: 'Cũ' }));
+      await contacts.create(form({ name: 'Mới' }));
 
-      expect(contacts.list()[0].name).toBe('Mới');
+      expect((await contacts.list())[0].name).toBe('Mới');
     });
   });
 
   describe('xoá', () => {
-    it('xoá liên hệ thì xoá luôn tệp đính kèm', () => {
-      const contact = contacts.create(form(), upload());
+    it('xoá liên hệ thì xoá luôn tệp đính kèm', async () => {
+      const contact = await contacts.create(form(), upload());
       expect(readdirSync(uploadDir())).toHaveLength(1);
 
-      contacts.remove(contact.id);
+      await contacts.remove(contact.id);
 
-      expect(contacts.findOne(contact.id)).toBeNull();
+      expect(await contacts.findOne(contact.id)).toBeNull();
       expect(readdirSync(uploadDir())).toHaveLength(0);
     });
 
-    it('xoá liên hệ không có tệp vẫn bình thường', () => {
-      const contact = contacts.create(form());
-      expect(() => contacts.remove(contact.id)).not.toThrow();
+    it('xoá liên hệ không có tệp vẫn bình thường', async () => {
+      const contact = await contacts.create(form());
+      await expect(contacts.remove(contact.id)).resolves.toBeUndefined();
     });
 
-    it('xoá id không tồn tại báo 404', () => {
-      expect(() => contacts.remove(9999)).toThrow(/Không tìm thấy liên hệ/);
+    it('xoá id không tồn tại báo 404', async () => {
+      await expect(contacts.remove(9999)).rejects.toThrow(
+        /Không tìm thấy liên hệ/,
+      );
     });
   });
 });

@@ -7,7 +7,7 @@ import {
 import { ARTICLE_CATEGORY_CODE } from '../common/article-categories';
 import { matchesSearch } from '../common/search';
 import { slugify } from '../common/slugify';
-import { SqliteService } from '../database/sqlite.service';
+import { DatabaseService } from '../database/database.service';
 import {
   isBlankArticleHtml,
   normalizeArticleContent,
@@ -22,8 +22,8 @@ import { ListArticlesDto } from './dto/list-articles.dto';
 import { CreateArticleDto, UpdateArticleDto } from './dto/save-article.dto';
 
 type ArticleRow = {
-  id: number | bigint;
-  categoryDetailId: number | bigint;
+  id: number;
+  categoryDetailId: number;
   slug: string;
   title: string;
   summary: string | null;
@@ -32,8 +32,8 @@ type ArticleRow = {
   author: string;
   publishedAt: string | null;
   status: string;
-  featured: number | bigint;
-  viewCount: number | bigint;
+  featured: number;
+  viewCount: number;
   createdAt: string;
   updatedAt: string;
   categoryCode: string | null;
@@ -42,7 +42,7 @@ type ArticleRow = {
 
 @Injectable()
 export class ArticlesService {
-  constructor(private readonly sqlite: SqliteService) {}
+  constructor(private readonly db: DatabaseService) {}
 
   private toArticle(row: ArticleRow, now: string): Article {
     const publishedAt = row.publishedAt;
@@ -97,7 +97,7 @@ export class ArticlesService {
               LEFT JOIN category_details d ON d.id = a.categoryDetailId`;
   }
 
-  list(query: ListArticlesDto = {}): Article[] {
+  async list(query: ListArticlesDto = {}): Promise<Article[]> {
     const now = new Date().toISOString();
     const where: string[] = [];
     const params: (string | number)[] = [];
@@ -121,20 +121,19 @@ export class ArticlesService {
       params.push(now);
     }
 
-    const rows = this.sqlite.db
-      .prepare(
-        `${this.selectAll()}
-         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-         ORDER BY a.featured DESC,
-                  COALESCE(a.publishedAt, a.createdAt) DESC,
-                  a.id DESC`,
-      )
-      .all(...params) as ArticleRow[];
+    const rows = await this.db.all<ArticleRow>(
+      `${this.selectAll()}
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       ORDER BY a.featured DESC,
+                COALESCE(a.publishedAt, a.createdAt) DESC,
+                a.id DESC`,
+      params,
+    );
 
     const items = rows.map((row) => this.toArticle(row, now));
     if (!query.search) return items;
 
-    // Lọc trong JS vì SQLite dựng sẵn không bỏ dấu được — xem common/search.ts
+    // Lọc trong JS để bỏ dấu thống nhất với các module khác — xem common/search.ts
     return items.filter((article) =>
       matchesSearch(
         query.search ?? '',
@@ -145,52 +144,52 @@ export class ArticlesService {
     );
   }
 
-  findOne(id: number): Article | null {
-    const row = this.sqlite.db
-      .prepare(`${this.selectAll()} WHERE a.id = ?`)
-      .get(id) as ArticleRow | undefined;
+  async findOne(id: number): Promise<Article | null> {
+    const row = await this.db.get<ArticleRow>(
+      `${this.selectAll()} WHERE a.id = ?`,
+      [id],
+    );
     return row ? this.toArticle(row, new Date().toISOString()) : null;
   }
 
-  findOneOrFail(id: number): Article {
-    const article = this.findOne(id);
+  async findOneOrFail(id: number): Promise<Article> {
+    const article = await this.findOne(id);
     if (!article) {
       throw new NotFoundException(`Không tìm thấy bài viết ${id}`);
     }
     return article;
   }
 
-  findBySlug(slug: string): Article | null {
-    const row = this.sqlite.db
-      .prepare(`${this.selectAll()} WHERE a.slug = ?`)
-      .get(slug) as ArticleRow | undefined;
+  async findBySlug(slug: string): Promise<Article | null> {
+    const row = await this.db.get<ArticleRow>(
+      `${this.selectAll()} WHERE a.slug = ?`,
+      [slug],
+    );
     return row ? this.toArticle(row, new Date().toISOString()) : null;
   }
 
-  count(): number {
-    const row = this.sqlite.db
-      .prepare('SELECT COUNT(*) AS total FROM articles')
-      .get() as { total: number | bigint } | undefined;
+  async count(): Promise<number> {
+    const row = await this.db.get<{ total: number }>(
+      'SELECT COUNT(*) AS total FROM articles',
+    );
     return Number(row?.total ?? 0);
   }
 
-  create(dto: CreateArticleDto): Article {
-    return this.sqlite.transaction(() => {
-      this.assertCategory(dto.categoryDetailId);
+  async create(dto: CreateArticleDto): Promise<Article> {
+    return this.db.transaction(async () => {
+      await this.assertCategory(dto.categoryDetailId);
 
       const now = new Date().toISOString();
       const status = dto.status ?? 'draft';
-      const slug = this.resolveSlug(dto.slug, dto.title);
+      const slug = await this.resolveSlug(dto.slug, dto.title);
 
-      const result = this.sqlite.db
-        .prepare(
-          `INSERT INTO articles
-             (categoryDetailId, slug, title, summary, content, coverImage,
-              author, publishedAt, status, featured, viewCount,
-              createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
-        )
-        .run(
+      const result = await this.db.run(
+        `INSERT INTO articles
+           (categoryDetailId, slug, title, summary, content, coverImage,
+            author, publishedAt, status, featured, viewCount,
+            createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+        [
           dto.categoryDetailId,
           slug,
           dto.title,
@@ -203,18 +202,19 @@ export class ArticlesService {
           dto.featured ? 1 : 0,
           now,
           now,
-        );
+        ],
+      );
 
-      return this.findOneOrFail(Number(result.lastInsertRowid));
+      return this.findOneOrFail(result.lastInsertId);
     });
   }
 
-  update(id: number, dto: UpdateArticleDto): Article {
-    return this.sqlite.transaction(() => {
-      const current = this.findOneOrFail(id);
+  async update(id: number, dto: UpdateArticleDto): Promise<Article> {
+    return this.db.transaction(async () => {
+      const current = await this.findOneOrFail(id);
 
       if (dto.categoryDetailId !== undefined) {
-        this.assertCategory(dto.categoryDetailId);
+        await this.assertCategory(dto.categoryDetailId);
       }
 
       const now = new Date().toISOString();
@@ -222,7 +222,7 @@ export class ArticlesService {
       const slug =
         dto.slug === undefined
           ? current.slug
-          : this.resolveSlug(dto.slug, dto.title ?? current.title, id);
+          : await this.resolveSlug(dto.slug, dto.title ?? current.title, id);
 
       // Không gửi trường ngày thì giữ nguyên ngày cũ. Quy tắc "published mà
       // chưa có ngày thì lấy bây giờ" nằm trong resolvePublishedAt, nên nó áp
@@ -233,15 +233,13 @@ export class ArticlesService {
         now,
       );
 
-      this.sqlite.db
-        .prepare(
-          `UPDATE articles
-              SET categoryDetailId = ?, slug = ?, title = ?, summary = ?,
-                  content = ?, coverImage = ?, author = ?, publishedAt = ?,
-                  status = ?, featured = ?, updatedAt = ?
-            WHERE id = ?`,
-        )
-        .run(
+      await this.db.run(
+        `UPDATE articles
+            SET categoryDetailId = ?, slug = ?, title = ?, summary = ?,
+                content = ?, coverImage = ?, author = ?, publishedAt = ?,
+                status = ?, featured = ?, updatedAt = ?
+          WHERE id = ?`,
+        [
           dto.categoryDetailId ?? current.categoryDetailId,
           slug,
           dto.title ?? current.title,
@@ -256,42 +254,40 @@ export class ArticlesService {
           (dto.featured ?? current.featured) ? 1 : 0,
           now,
           id,
-        );
+        ],
+      );
 
       return this.findOneOrFail(id);
     });
   }
 
-  remove(id: number): void {
-    this.findOneOrFail(id);
-    this.sqlite.db.prepare('DELETE FROM articles WHERE id = ?').run(id);
+  async remove(id: number): Promise<void> {
+    await this.findOneOrFail(id);
+    await this.db.run('DELETE FROM articles WHERE id = ?', [id]);
   }
 
   /** Đếm lượt xem ở trang ngoài. Không đụng `updatedAt`: đây không phải sửa bài. */
-  recordView(slug: string): void {
-    this.sqlite.db
-      .prepare('UPDATE articles SET viewCount = viewCount + 1 WHERE slug = ?')
-      .run(slug);
+  async recordView(slug: string): Promise<void> {
+    await this.db.run(
+      'UPDATE articles SET viewCount = viewCount + 1 WHERE slug = ?',
+      [slug],
+    );
   }
 
   /** Số bài theo từng chuyên mục, dùng cho bộ lọc ở trang ngoài. */
-  countsByCategory(onlyLive = false): Record<number, number> {
+  async countsByCategory(onlyLive = false): Promise<Record<number, number>> {
     const now = new Date().toISOString();
-    const rows = this.sqlite.db
-      .prepare(
-        `SELECT categoryDetailId AS id, COUNT(*) AS total
-           FROM articles
-          ${
-            onlyLive
-              ? "WHERE status = 'published' AND publishedAt IS NOT NULL AND publishedAt <= ?"
-              : ''
-          }
-          GROUP BY categoryDetailId`,
-      )
-      .all(...(onlyLive ? [now] : [])) as {
-      id: number | bigint;
-      total: number | bigint;
-    }[];
+    const rows = await this.db.all<{ id: number; total: number }>(
+      `SELECT categoryDetailId AS id, COUNT(*) AS total
+         FROM articles
+        ${
+          onlyLive
+            ? "WHERE status = 'published' AND publishedAt IS NOT NULL AND publishedAt <= ?"
+            : ''
+        }
+        GROUP BY categoryDetailId`,
+      onlyLive ? [now] : [],
+    );
 
     return Object.fromEntries(
       rows.map((row) => [Number(row.id), Number(row.total)]),
@@ -300,19 +296,17 @@ export class ArticlesService {
 
   /**
    * Chuyên mục phải là chi tiết đang bật của đúng danh mục `DM_CHUYEN_MUC`.
-   * Truy vấn thẳng bảng thay vì phụ thuộc CategoriesModule — cùng một kết nối
-   * SQLite, và tránh vòng phụ thuộc giữa hai module.
+   * Truy vấn thẳng bảng thay vì phụ thuộc CategoriesModule — cùng một database,
+   * và tránh vòng phụ thuộc giữa hai module.
    */
-  private assertCategory(categoryDetailId: number): void {
-    const row = this.sqlite.db
-      .prepare(
-        `SELECT d.status AS status
-           FROM category_details d
-           JOIN categories c ON c.id = d.categoryId
-          WHERE d.id = ? AND c.code = ?`,
-      )
-      .get(categoryDetailId, ARTICLE_CATEGORY_CODE) as
-      { status: string } | undefined;
+  private async assertCategory(categoryDetailId: number): Promise<void> {
+    const row = await this.db.get<{ status: string }>(
+      `SELECT d.status AS status
+         FROM category_details d
+         JOIN categories c ON c.id = d.categoryId
+        WHERE d.id = ? AND c.code = ?`,
+      [categoryDetailId, ARTICLE_CATEGORY_CODE],
+    );
 
     if (!row) {
       throw new BadRequestException(
@@ -344,19 +338,20 @@ export class ArticlesService {
    * Slug phải duy nhất vì nó là URL của bài. Trùng thì nối thêm `-2`, `-3`...
    * thay vì báo lỗi — hai bài cùng tiêu đề là chuyện bình thường.
    */
-  private resolveSlug(
+  private async resolveSlug(
     requested: string | undefined,
     title: string,
     selfId?: number,
-  ): string {
+  ): Promise<string> {
     const base =
       (requested && slugify(requested)) || slugify(title) || 'bai-viet';
 
     for (let suffix = 1; ; suffix += 1) {
       const candidate = suffix === 1 ? base : `${base}-${suffix}`;
-      const clash = this.sqlite.db
-        .prepare('SELECT id FROM articles WHERE slug = ?')
-        .get(candidate) as { id: number | bigint } | undefined;
+      const clash = await this.db.get<{ id: number }>(
+        'SELECT id FROM articles WHERE slug = ?',
+        [candidate],
+      );
 
       if (!clash || (selfId !== undefined && Number(clash.id) === selfId)) {
         return candidate;

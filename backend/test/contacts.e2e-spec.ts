@@ -1,26 +1,25 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
+import { rmSync } from 'node:fs';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 
 import { AppModule } from './../src/app.module';
 import { createValidationPipe } from './../src/common/validation';
 import { MAX_ATTACHMENT_BYTES } from './../src/contacts/attachments';
+import { testDatabaseConfig } from './../src/database/testing';
 
 const API_KEY = 'test-api-key';
 
 describe('Contacts (e2e)', () => {
   let app: INestApplication<App>;
-  let tempDir: string;
+  let config: Record<string, string>;
 
   const auth = () => ({ 'x-api-key': API_KEY });
 
   beforeEach(async () => {
-    tempDir = mkdtempSync(path.join(tmpdir(), 'nest-contacts-e2e-'));
-    process.env.DATABASE_FILE = path.join(tempDir, 'e2e.db');
+    config = testDatabaseConfig();
+    Object.assign(process.env, config);
     process.env.BACKEND_API_KEY = API_KEY;
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -35,8 +34,8 @@ describe('Contacts (e2e)', () => {
 
   afterEach(async () => {
     await app.close();
-    rmSync(tempDir, { recursive: true, force: true });
-    delete process.env.DATABASE_FILE;
+    rmSync(config.UPLOAD_DIR, { recursive: true, force: true });
+    for (const key of Object.keys(config)) delete process.env[key];
     delete process.env.BACKEND_API_KEY;
   });
 
