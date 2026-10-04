@@ -3,13 +3,15 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { requireAdmin } from "@/lib/admin";
+import { can } from "@/lib/access";
+import { requirePermission } from "@/lib/admin";
 import { parseVideoUrl, VIDEO_URL_HINT } from "@/lib/video";
 import { BackendError } from "@/lib/backend";
 import {
   PRODUCT_STATUSES,
   createProduct,
   deleteProduct,
+  findProduct,
   updateProduct,
   type ProductStatus,
   type SaveProductInput,
@@ -38,13 +40,18 @@ function readGallery(formData: FormData): string[] | { error: string } {
   if (raw === "") return [];
   try {
     const value: unknown = JSON.parse(raw);
-    if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    if (
+      Array.isArray(value) &&
+      value.every((item) => typeof item === "string")
+    ) {
       return value;
     }
   } catch {
     // rơi xuống báo lỗi bên dưới
   }
-  return { error: "Bộ sưu tập ảnh không hợp lệ, hãy tải lại trang và thử lại." };
+  return {
+    error: "Bộ sưu tập ảnh không hợp lệ, hãy tải lại trang và thử lại.",
+  };
 }
 
 /**
@@ -73,7 +80,9 @@ function readSpecs(
   } catch {
     // rơi xuống báo lỗi bên dưới
   }
-  return { error: "Thông số kỹ thuật không hợp lệ, hãy tải lại trang và thử lại." };
+  return {
+    error: "Thông số kỹ thuật không hợp lệ, hãy tải lại trang và thử lại.",
+  };
 }
 
 /**
@@ -149,6 +158,11 @@ function readForm(formData: FormData): SaveProductInput | { error: string } {
   };
 }
 
+const PUBLISH_DENIED: FormState = {
+  error:
+    "Bạn không có quyền mở bán / ngừng bán sản phẩm — hãy lưu ở dạng nháp.",
+};
+
 /** Lỗi nghiệp vụ hiện trên form thay vì làm vỡ cả trang. */
 async function save(
   work: () => Promise<unknown>,
@@ -169,10 +183,14 @@ export async function createProductAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  const user = await requirePermission("PRODUCTS.WRITE");
 
   const input = readForm(formData);
   if ("error" in input) return input;
+  // Nhập sản phẩm là WRITE; mở bán (hoặc ngừng bán) ngay khi tạo là PUBLISH.
+  if (input.status !== "draft" && !can(user, "PRODUCTS.PUBLISH")) {
+    return PUBLISH_DENIED;
+  }
 
   return save(() => createProduct(input), LIST_PATH);
 }
@@ -182,10 +200,15 @@ export async function updateProductAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  const user = await requirePermission("PRODUCTS.WRITE");
 
   const input = readForm(formData);
   if ("error" in input) return input;
+  // Sửa thông tin sản phẩm đang bán chỉ cần WRITE; đổi trạng thái cần PUBLISH.
+  if (!can(user, "PRODUCTS.PUBLISH")) {
+    const current = await findProduct(id);
+    if (current && current.status !== input.status) return PUBLISH_DENIED;
+  }
 
   return save(() => updateProduct(id, input), LIST_PATH);
 }
@@ -194,7 +217,7 @@ export async function updateProductAction(
 export async function setProductStatusAction(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  await requirePermission("PRODUCTS.PUBLISH");
 
   const raw = text(formData, "status");
   const status = (PRODUCT_STATUSES as readonly string[]).includes(raw)
@@ -209,7 +232,7 @@ export async function setProductStatusAction(
 export async function toggleProductStockAction(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  await requirePermission("PRODUCTS.WRITE");
 
   await updateProduct(text(formData, "id"), {
     inStock: text(formData, "inStock") === "true",
@@ -221,7 +244,7 @@ export async function deleteProductAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  await requirePermission("PRODUCTS.WRITE");
 
   try {
     await deleteProduct(text(formData, "id"));

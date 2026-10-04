@@ -9,6 +9,8 @@ import {
 } from "@/components/admin/order-actions";
 import { BackLink, PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/badge";
+import { can } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { formatDateTime, formatVnd } from "@/lib/format";
 import {
   ORDER_STATUS_LABELS,
@@ -42,7 +44,13 @@ function Section({
   );
 }
 
-function Info({ label, children }: { label: string; children: React.ReactNode }) {
+function Info({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <dt className="text-xs text-admin-muted">{label}</dt>
@@ -74,8 +82,12 @@ export default async function AdminOrderPage(
   props: PageProps<"/admin/orders/[id]">,
 ) {
   const { id } = await props.params;
-  const order = await findOrder(id);
+  const [order, user] = await Promise.all([findOrder(id), currentUser()]);
   if (!order) notFound();
+
+  // Layout chỉ đòi ORDERS.READ — chỉ hiện form người xem dùng được.
+  const canWrite = can(user!, "ORDERS.WRITE");
+  const canPayment = can(user!, "ORDERS.PAYMENT");
 
   const paymentTone =
     order.paymentStatus === "paid"
@@ -96,7 +108,9 @@ export default async function AdminOrderPage(
             <Badge tone={ORDER_STATUS_TONES[order.status]}>
               {ORDER_STATUS_LABELS[order.status]}
             </Badge>
-            <Badge tone={paymentTone}>{PAYMENT_STATUS_LABELS[order.paymentStatus]}</Badge>
+            <Badge tone={paymentTone}>
+              {PAYMENT_STATUS_LABELS[order.paymentStatus]}
+            </Badge>
           </span>
         }
       />
@@ -106,7 +120,10 @@ export default async function AdminOrderPage(
           <Section title={`Sản phẩm (${order.itemCount})`}>
             <ul className="divide-y divide-admin-border">
               {order.items.map((item) => (
-                <li key={item.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <li
+                  key={item.id}
+                  className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                >
                   {item.image ? (
                     // URL tuỳ ý (có thể là link ngoài) nên dùng img thường.
                     // eslint-disable-next-line @next/next/no-img-element
@@ -192,31 +209,41 @@ export default async function AdminOrderPage(
         </div>
 
         <div className="space-y-5">
-          <Section title="Xử lý đơn">
-            <OrderStatusActions orderId={order.id} status={order.status} />
-          </Section>
+          {canWrite && (
+            <Section title="Xử lý đơn">
+              <OrderStatusActions orderId={order.id} status={order.status} />
+            </Section>
+          )}
 
           <Section title="Thanh toán">
-            <p className="mb-3 text-sm">
+            <p className={`${canPayment ? "mb-3 " : ""}text-sm`}>
               {PAYMENT_METHOD_LABELS[order.paymentMethod]}
             </p>
-            <OrderPaymentActions
-              orderId={order.id}
-              paymentStatus={order.paymentStatus}
-            />
+            {canPayment && (
+              <OrderPaymentActions
+                orderId={order.id}
+                paymentStatus={order.paymentStatus}
+              />
+            )}
           </Section>
 
           <Section title="Khách hàng">
             <dl className="space-y-3">
               <Info label="Họ tên">{order.customerName}</Info>
               <Info label="Điện thoại">
-                <a href={`tel:${order.customerPhone.replace(/[^\d+]/g, "")}`} className="text-brand-600 hover:underline">
+                <a
+                  href={`tel:${order.customerPhone.replace(/[^\d+]/g, "")}`}
+                  className="text-brand-600 hover:underline"
+                >
                   {order.customerPhone}
                 </a>
               </Info>
               {order.customerEmail && (
                 <Info label="Email">
-                  <a href={`mailto:${order.customerEmail}`} className="text-brand-600 hover:underline">
+                  <a
+                    href={`mailto:${order.customerEmail}`}
+                    className="text-brand-600 hover:underline"
+                  >
                     {order.customerEmail}
                   </a>
                 </Info>
@@ -242,9 +269,17 @@ export default async function AdminOrderPage(
             </dl>
           </Section>
 
-          <Section title="Ghi chú nội bộ">
-            <OrderNoteForm orderId={order.id} adminNote={order.adminNote} />
-          </Section>
+          {canWrite ? (
+            <Section title="Ghi chú nội bộ">
+              <OrderNoteForm orderId={order.id} adminNote={order.adminNote} />
+            </Section>
+          ) : (
+            order.adminNote && (
+              <Section title="Ghi chú nội bộ">
+                <p className="text-sm whitespace-pre-line">{order.adminNote}</p>
+              </Section>
+            )
+          )}
         </div>
       </div>
     </div>

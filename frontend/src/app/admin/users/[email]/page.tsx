@@ -8,6 +8,8 @@ import {
 } from "@/components/admin/user-admin-forms";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/badge";
+import { can, isSuperAdmin } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { listPermissionGroups } from "@/lib/permission-groups";
 import { CARD, CARD_SUBTLE, CODE_CHIP } from "@/lib/styles";
@@ -26,13 +28,24 @@ export default async function AdminUserDetailPage(
   const { email: rawEmail } = await props.params;
   const email = decodeURIComponent(rawEmail);
 
-  const [user, groups, history] = await Promise.all([
+  const [user, groups, history, actor] = await Promise.all([
     findUserByEmail(email),
     listPermissionGroups(),
     getLoginHistory(email, 10),
+    currentUser(),
   ]);
 
   if (!user) notFound();
+
+  // Layout chỉ đòi USERS.READ. Người có USERS.WRITE mà không phải admin thì
+  // không được đụng tới tài khoản admin, không đổi vai trò, không tự gán nhóm
+  // cho mình — giống hệt các kiểm tra trong ../actions.ts.
+  const superAdmin = isSuperAdmin(actor!);
+  const canEdit =
+    can(actor!, "USERS.WRITE") && (superAdmin || user.role !== "admin");
+  const canEditGroups =
+    canEdit &&
+    (superAdmin || user.email.toLowerCase() !== actor!.email.toLowerCase());
 
   // Mã tỉnh/phường lưu trong DB, đổi sang tên để hiển thị.
   const [provinces, wards] = await Promise.all([
@@ -105,7 +118,9 @@ export default async function AdminUserDetailPage(
         </div>
       </header>
 
-      <section className={`${CARD_SUBTLE} grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-5`}>
+      <section
+        className={`${CARD_SUBTLE} grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-5`}
+      >
         {facts.map((fact) => (
           <div key={fact.label}>
             <p className="text-xs font-medium tracking-wide text-admin-muted uppercase">
@@ -160,18 +175,38 @@ export default async function AdminUserDetailPage(
       </section>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <section className={`${CARD_SUBTLE} space-y-4`}>
-          <h3 className="text-sm font-semibold">Vai trò &amp; trạng thái</h3>
-          <RoleStatusForm user={user} action={updateUserAction} />
-        </section>
+        {canEdit && (
+          <section className={`${CARD_SUBTLE} space-y-4`}>
+            <h3 className="text-sm font-semibold">Vai trò &amp; trạng thái</h3>
+            <RoleStatusForm
+              user={user}
+              action={updateUserAction}
+              canChangeRole={superAdmin}
+            />
+          </section>
+        )}
 
         <section className={`${CARD_SUBTLE} space-y-4`}>
           <h3 className="text-sm font-semibold">Nhóm quyền</h3>
-          <UserGroupsForm
-            user={user}
-            groups={groups}
-            action={setUserGroupsAction}
-          />
+          {canEditGroups ? (
+            <UserGroupsForm
+              user={user}
+              groups={groups}
+              action={setUserGroupsAction}
+            />
+          ) : (
+            // Không sửa được thì chỉ liệt kê nhóm đang gán.
+            <div className="flex flex-wrap gap-2">
+              {user.groups.map((group) => (
+                <Badge key={group.id} tone="brand">
+                  {group.name}
+                </Badge>
+              ))}
+              {user.groups.length === 0 && (
+                <p className="text-sm text-admin-muted">Chưa thuộc nhóm nào.</p>
+              )}
+            </div>
+          )}
         </section>
       </div>
 

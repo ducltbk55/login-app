@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { requireAdmin } from "@/lib/admin";
+import { requirePermission } from "@/lib/admin";
 import { BackendError } from "@/lib/backend";
 import { contactAttachment } from "@/lib/contacts";
 
@@ -9,7 +9,7 @@ import { contactAttachment } from "@/lib/contacts";
  *
  * Tệp KHÔNG nằm trong thư mục tĩnh: nội dung khách gửi có thể là hồ sơ, hợp
  * đồng, ảnh chụp màn hình có dữ liệu riêng. Đi qua route này thì mỗi lần tải
- * đều phải qua `requireAdmin`, và khoá nội bộ của backend không bao giờ lộ ra
+ * đều phải qua `requirePermission`, và khoá nội bộ của backend không bao giờ lộ ra
  * phía trình duyệt.
  *
  * Luồng được chuyển tiếp nguyên vẹn, không nạp cả tệp vào bộ nhớ.
@@ -18,7 +18,7 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  await requireAdmin();
+  await requirePermission("CONTACTS.READ");
 
   const { id } = await context.params;
 

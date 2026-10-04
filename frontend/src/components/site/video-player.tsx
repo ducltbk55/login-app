@@ -55,7 +55,12 @@ export function VideoPlayer({
         />
         <span className="absolute inset-0 grid place-items-center">
           <span className="grid size-16 place-items-center rounded-full bg-red-600 text-white shadow-lg transition group-hover:scale-110">
-            <svg viewBox="0 0 24 24" className="ml-1 size-7" fill="currentColor" aria-hidden>
+            <svg
+              viewBox="0 0 24 24"
+              className="ml-1 size-7"
+              fill="currentColor"
+              aria-hidden
+            >
               <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14Z" />
             </svg>
           </span>

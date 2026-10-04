@@ -1,8 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "@/components/admin/icons";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CloseIcon,
+} from "@/components/admin/icons";
 
 /** Kéo ngang quá ngần này (px) mới tính là vuốt chuyển ảnh. */
 const SWIPE_THRESHOLD = 40;
@@ -95,14 +105,21 @@ export function ProductGallery({
   const thumbsRef = useRef<HTMLUListElement>(null);
   const count = images.length;
 
-  const prev = useCallback(() => setIndex((i) => (i - 1 + count) % count), [count]);
+  const prev = useCallback(
+    () => setIndex((i) => (i - 1 + count) % count),
+    [count],
+  );
   const next = useCallback(() => setIndex((i) => (i + 1) % count), [count]);
   const swipe = useSwipe(prev, next);
 
   // Giữ ảnh nhỏ đang chọn luôn nằm trong vùng nhìn thấy của dải ảnh.
   useEffect(() => {
     const thumb = thumbsRef.current?.children[index] as HTMLElement | undefined;
-    thumb?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    thumb?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+      behavior: "smooth",
+    });
   }, [index]);
 
   // Chế độ toàn màn hình: phím mũi tên / Esc, và khoá cuộn trang phía sau.

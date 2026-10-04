@@ -35,7 +35,9 @@ function PaymentBadge({ order }: { order: Order }) {
       : order.paymentStatus === "refunded"
         ? "danger"
         : "neutral";
-  return <Badge tone={tone}>{PAYMENT_STATUS_LABELS[order.paymentStatus]}</Badge>;
+  return (
+    <Badge tone={tone}>{PAYMENT_STATUS_LABELS[order.paymentStatus]}</Badge>
+  );
 }
 
 /** "Phần mềm A + 2 sản phẩm khác" — đủ nhận ra đơn mà không chiếm chỗ. */
@@ -57,7 +59,9 @@ export default async function AdminOrdersPage(
     ? (rawStatus as OrderStatus)
     : undefined;
   const rawPayment = pickOne(params.paymentStatus) ?? "";
-  const paymentStatus = (PAYMENT_STATUSES as readonly string[]).includes(rawPayment)
+  const paymentStatus = (PAYMENT_STATUSES as readonly string[]).includes(
+    rawPayment,
+  )
     ? (rawPayment as PaymentStatus)
     : undefined;
   const page = Number(pickOne(params.page) ?? 1);
@@ -76,7 +80,12 @@ export default async function AdminOrdersPage(
   const filtered = Boolean(search || status || paymentStatus);
 
   // Ô thống kê cũng là lối tắt lọc theo trạng thái.
-  const tiles: { label: string; value: string; href?: string; highlight?: boolean }[] = [
+  const tiles: {
+    label: string;
+    value: string;
+    href?: string;
+    highlight?: boolean;
+  }[] = [
     {
       label: "Chờ xác nhận",
       value: String(stats.byStatus.pending),
@@ -93,7 +102,10 @@ export default async function AdminOrdersPage(
       value: String(stats.byStatus.completed),
       href: "/admin/orders?status=completed",
     },
-    { label: `Doanh thu · ${stats.today} đơn hôm nay`, value: formatVnd(stats.revenue) },
+    {
+      label: `Doanh thu · ${stats.today} đơn hôm nay`,
+      value: formatVnd(stats.revenue),
+    },
   ];
 
   const emptyState = (
@@ -126,7 +138,9 @@ export default async function AdminOrdersPage(
               >
                 {tile.value}
               </p>
-              <p className="mt-0.5 truncate text-xs text-admin-muted">{tile.label}</p>
+              <p className="mt-0.5 truncate text-xs text-admin-muted">
+                {tile.label}
+              </p>
             </>
           );
           return tile.href ? (
@@ -183,7 +197,10 @@ export default async function AdminOrdersPage(
           />
         </Field>
         <div className="flex gap-2">
-          <button type="submit" className={`${BUTTON.primary} flex-1 sm:flex-none`}>
+          <button
+            type="submit"
+            className={`${BUTTON.primary} flex-1 sm:flex-none`}
+          >
             Lọc
           </button>
           {filtered && (
@@ -201,10 +218,15 @@ export default async function AdminOrdersPage(
       <ul className="grid gap-3 md:hidden">
         {orders.map((order) => (
           <li key={order.id}>
-            <Link href={`/admin/orders/${order.id}`} className={`${ROW_CARD} block`}>
+            <Link
+              href={`/admin/orders/${order.id}`}
+              className={`${ROW_CARD} block`}
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-mono text-sm font-semibold">{order.code}</p>
+                  <p className="font-mono text-sm font-semibold">
+                    {order.code}
+                  </p>
                   <p className="text-xs text-admin-muted">
                     {formatDateTime(order.createdAt)}
                   </p>
@@ -216,9 +238,13 @@ export default async function AdminOrdersPage(
               <p className="text-sm">
                 {order.customerName} · {order.customerPhone}
               </p>
-              <p className="truncate text-xs text-admin-muted">{itemsSummary(order)}</p>
+              <p className="truncate text-xs text-admin-muted">
+                {itemsSummary(order)}
+              </p>
               <div className="flex items-center justify-between border-t border-admin-border/60 pt-3">
-                <span className="font-semibold tabular-nums">{formatVnd(order.total)}</span>
+                <span className="font-semibold tabular-nums">
+                  {formatVnd(order.total)}
+                </span>
                 <PaymentBadge order={order} />
               </div>
             </Link>
@@ -252,16 +278,24 @@ export default async function AdminOrdersPage(
                   </Link>
                 </td>
                 <td className={TABLE.td}>
-                  <span className="block text-sm font-medium">{order.customerName}</span>
-                  <span className="block text-xs text-admin-muted">{order.customerPhone}</span>
+                  <span className="block text-sm font-medium">
+                    {order.customerName}
+                  </span>
+                  <span className="block text-xs text-admin-muted">
+                    {order.customerPhone}
+                  </span>
                 </td>
                 <td className={`${TABLE.td} max-w-64`}>
-                  <span className="block truncate text-sm">{itemsSummary(order)}</span>
+                  <span className="block truncate text-sm">
+                    {itemsSummary(order)}
+                  </span>
                   <span className="block text-xs text-admin-muted">
                     {order.itemCount} món
                   </span>
                 </td>
-                <td className={`${TABLE.td} text-right font-semibold whitespace-nowrap tabular-nums`}>
+                <td
+                  className={`${TABLE.td} text-right font-semibold whitespace-nowrap tabular-nums`}
+                >
                   {formatVnd(order.total)}
                 </td>
                 <td className={`${TABLE.td} whitespace-nowrap`}>
@@ -275,7 +309,9 @@ export default async function AdminOrdersPage(
                     {ORDER_STATUS_LABELS[order.status]}
                   </Badge>
                 </td>
-                <td className={`${TABLE.td} text-admin-muted whitespace-nowrap`}>
+                <td
+                  className={`${TABLE.td} text-admin-muted whitespace-nowrap`}
+                >
                   {formatDateTime(order.createdAt)}
                 </td>
               </tr>

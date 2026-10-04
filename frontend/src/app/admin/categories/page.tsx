@@ -12,6 +12,8 @@ import {
   listCategories,
   type CategoryStatus,
 } from "@/lib/categories";
+import { can } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 import {
   BUTTON,
@@ -37,12 +39,15 @@ export default async function AdminCategoriesPage(
   const status = pickOne(params.status) as CategoryStatus | undefined;
   const page = Number(pickOne(params.page) ?? 1);
 
-  const [result, all] = await Promise.all([
+  const [result, all, user] = await Promise.all([
     listCategories({ search, status, page: Number.isFinite(page) ? page : 1 }),
     // Ô thống kê nói về toàn bộ hệ thống nên không chịu ảnh hưởng của bộ lọc
     // lẫn phân trang.
     listAllCategories(),
+    currentUser(),
   ]);
+  // Layout chỉ đòi CATEGORIES.READ — ẩn những nút người xem không dùng được.
+  const canWrite = can(user!, "CATEGORIES.WRITE");
   const categories = result.items;
   const filtered = Boolean(search || status);
 
@@ -62,14 +67,14 @@ export default async function AdminCategoriesPage(
     },
   ];
 
-  const addButton = (
+  const addButton = canWrite ? (
     <Link
       href="/admin/categories/new"
       className={`${BUTTON.primary} w-full sm:w-auto`}
     >
       + Thêm danh mục
     </Link>
-  );
+  ) : undefined;
 
   return (
     <div className="space-y-5">
@@ -135,7 +140,10 @@ export default async function AdminCategoriesPage(
         {categories.map((category) => (
           <li key={category.id} className={ROW_CARD}>
             <div className="flex items-start justify-between gap-3">
-              <Link href={`/admin/categories/${category.id}`} className="min-w-0">
+              <Link
+                href={`/admin/categories/${category.id}`}
+                className="min-w-0"
+              >
                 <p className="font-medium">{category.name}</p>
                 <code className={`${CODE_CHIP} mt-1 inline-block`}>
                   {category.code}
@@ -187,27 +195,31 @@ export default async function AdminCategoriesPage(
                 className={`${BUTTON.secondary} ${BUTTON_SM}`}
               >
                 <PencilIcon className="size-3.5" />
-                Sửa
+                {canWrite ? "Sửa" : "Xem"}
               </Link>
-              <form action={toggleCategoryAction}>
-                <input type="hidden" name="id" value={category.id} />
-                <input
-                  type="hidden"
-                  name="status"
-                  value={category.status === "active" ? "inactive" : "active"}
+              {canWrite && (
+                <form action={toggleCategoryAction}>
+                  <input type="hidden" name="id" value={category.id} />
+                  <input
+                    type="hidden"
+                    name="status"
+                    value={category.status === "active" ? "inactive" : "active"}
+                  />
+                  <button
+                    type="submit"
+                    className={`${BUTTON.secondary} ${BUTTON_SM}`}
+                  >
+                    {category.status === "active" ? "Tắt" : "Bật"}
+                  </button>
+                </form>
+              )}
+              {canWrite && (
+                <DeleteButton
+                  id={category.id}
+                  action={deleteCategoryAction}
+                  confirmText={`Xoá danh mục "${category.name}"? ${category.detailCount} chi tiết bên trong sẽ bị xoá theo.`}
                 />
-                <button
-                  type="submit"
-                  className={`${BUTTON.secondary} ${BUTTON_SM}`}
-                >
-                  {category.status === "active" ? "Tắt" : "Bật"}
-                </button>
-              </form>
-              <DeleteButton
-                id={category.id}
-                action={deleteCategoryAction}
-                confirmText={`Xoá danh mục "${category.name}"? ${category.detailCount} chi tiết bên trong sẽ bị xoá theo.`}
-              />
+              )}
             </div>
           </li>
         ))}
@@ -286,7 +298,9 @@ export default async function AdminCategoriesPage(
                 <td className={TABLE.td}>
                   <StatusDot status={category.status} />
                 </td>
-                <td className={`${TABLE.td} text-admin-muted whitespace-nowrap`}>
+                <td
+                  className={`${TABLE.td} text-admin-muted whitespace-nowrap`}
+                >
                   {formatDateTime(category.updatedAt)}
                 </td>
                 <td className={TABLE.td}>
@@ -302,33 +316,37 @@ export default async function AdminCategoriesPage(
                     </Link>
                     <Link
                       href={`/admin/categories/${category.id}`}
-                      title="Sửa danh mục"
-                      aria-label="Sửa danh mục"
+                      title={canWrite ? "Sửa danh mục" : "Xem danh mục"}
+                      aria-label={canWrite ? "Sửa danh mục" : "Xem danh mục"}
                       className={ICON_BUTTON}
                     >
                       <PencilIcon className="size-4" />
                     </Link>
-                    <form action={toggleCategoryAction}>
-                      <input type="hidden" name="id" value={category.id} />
-                      <input
-                        type="hidden"
-                        name="status"
-                        value={
-                          category.status === "active" ? "inactive" : "active"
-                        }
+                    {canWrite && (
+                      <form action={toggleCategoryAction}>
+                        <input type="hidden" name="id" value={category.id} />
+                        <input
+                          type="hidden"
+                          name="status"
+                          value={
+                            category.status === "active" ? "inactive" : "active"
+                          }
+                        />
+                        <button
+                          type="submit"
+                          className={`${BUTTON.secondary} ${BUTTON_SM}`}
+                        >
+                          {category.status === "active" ? "Tắt" : "Bật"}
+                        </button>
+                      </form>
+                    )}
+                    {canWrite && (
+                      <DeleteButton
+                        id={category.id}
+                        action={deleteCategoryAction}
+                        confirmText={`Xoá danh mục "${category.name}"? ${category.detailCount} chi tiết bên trong sẽ bị xoá theo.`}
                       />
-                      <button
-                        type="submit"
-                        className={`${BUTTON.secondary} ${BUTTON_SM}`}
-                      >
-                        {category.status === "active" ? "Tắt" : "Bật"}
-                      </button>
-                    </form>
-                    <DeleteButton
-                      id={category.id}
-                      action={deleteCategoryAction}
-                      confirmText={`Xoá danh mục "${category.name}"? ${category.detailCount} chi tiết bên trong sẽ bị xoá theo.`}
-                    />
+                    )}
                   </div>
                 </td>
               </tr>

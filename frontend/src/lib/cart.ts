@@ -18,7 +18,10 @@ const CHANGE_EVENT = "uyvu-cart-change";
 export const MAX_QTY = 99;
 
 const EMPTY: CartLine[] = [];
-let cache: { raw: string | null; lines: CartLine[] } = { raw: null, lines: EMPTY };
+let cache: { raw: string | null; lines: CartLine[] } = {
+  raw: null,
+  lines: EMPTY,
+};
 
 function parse(raw: string | null): CartLine[] {
   if (!raw) return EMPTY;

@@ -14,6 +14,8 @@ import {
   listCategoryDetails,
   type CategoryStatus,
 } from "@/lib/categories";
+import { can } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 import {
   BUTTON,
@@ -45,8 +47,10 @@ export default async function CategoryDetailsPage(
   const groupDetailId = rawGroup ? Number(rawGroup) : undefined;
   const rawPage = Number(pickOne(params.page) ?? 1);
 
-  const category = await findCategory(id);
+  const [category, user] = await Promise.all([findCategory(id), currentUser()]);
   if (!category) notFound();
+  // Layout chỉ đòi CATEGORIES.READ — ẩn những nút người xem không dùng được.
+  const canWrite = can(user!, "CATEGORIES.WRITE");
 
   const groupCategory = category.groupCategoryId
     ? await findCategory(category.groupCategoryId)
@@ -56,7 +60,9 @@ export default async function CategoryDetailsPage(
     listCategoryDetails(id, {
       search,
       status,
-      groupDetailId: Number.isInteger(groupDetailId) ? groupDetailId : undefined,
+      groupDetailId: Number.isInteger(groupDetailId)
+        ? groupDetailId
+        : undefined,
       page: Number.isFinite(rawPage) ? rawPage : 1,
     }),
     // Đếm riêng để con số ở banner nói về cả danh mục, không phải trang hiện tại.
@@ -84,14 +90,14 @@ export default async function CategoryDetailsPage(
   const filtered = Boolean(search || status || groupDetailId);
   const activeCount = activeOnly.total;
 
-  const addButton = (
+  const addButton = canWrite ? (
     <Link
       href={`${base}/details/new`}
       className={`${BUTTON.primary} w-full sm:w-auto`}
     >
       + Thêm chi tiết
     </Link>
-  );
+  ) : undefined;
 
   return (
     <div className="space-y-5">
@@ -155,7 +161,7 @@ export default async function CategoryDetailsPage(
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/25 px-4 py-2 text-sm font-medium transition hover:bg-white/15"
             >
               <PencilIcon className="size-4" />
-              Sửa danh mục
+              {canWrite ? "Sửa danh mục" : "Xem danh mục"}
             </Link>
           </div>
         </div>
@@ -276,29 +282,33 @@ export default async function CategoryDetailsPage(
                 href={`${base}/details/${detail.id}`}
                 className={`${BUTTON.secondary} ${BUTTON_SM}`}
               >
-                Sửa
+                {canWrite ? "Sửa" : "Xem"}
               </Link>
-              <form action={toggleCategoryDetailAction}>
-                <input type="hidden" name="categoryId" value={category.id} />
-                <input type="hidden" name="id" value={detail.id} />
-                <input
-                  type="hidden"
-                  name="status"
-                  value={detail.status === "active" ? "inactive" : "active"}
+              {canWrite && (
+                <form action={toggleCategoryDetailAction}>
+                  <input type="hidden" name="categoryId" value={category.id} />
+                  <input type="hidden" name="id" value={detail.id} />
+                  <input
+                    type="hidden"
+                    name="status"
+                    value={detail.status === "active" ? "inactive" : "active"}
+                  />
+                  <button
+                    type="submit"
+                    className={`${BUTTON.secondary} ${BUTTON_SM}`}
+                  >
+                    {detail.status === "active" ? "Tắt" : "Bật"}
+                  </button>
+                </form>
+              )}
+              {canWrite && (
+                <DeleteButton
+                  id={detail.id}
+                  fields={{ categoryId: category.id }}
+                  action={deleteCategoryDetailAction}
+                  confirmText={`Xoá chi tiết "${detail.name}"?`}
                 />
-                <button
-                  type="submit"
-                  className={`${BUTTON.secondary} ${BUTTON_SM}`}
-                >
-                  {detail.status === "active" ? "Tắt" : "Bật"}
-                </button>
-              </form>
-              <DeleteButton
-                id={detail.id}
-                fields={{ categoryId: category.id }}
-                action={deleteCategoryDetailAction}
-                confirmText={`Xoá chi tiết "${detail.name}"?`}
-              />
+              )}
             </div>
           </li>
         ))}
@@ -347,72 +357,82 @@ export default async function CategoryDetailsPage(
                   </tr>
                 ),
                 ...items.map((detail) => (
-              <tr key={detail.id} className={TABLE.tr}>
-                <td className={TABLE.td}>
-                  <code className={CODE_CHIP}>{detail.code}</code>
-                </td>
-                <td className={`${TABLE.td} max-w-xl`}>
-                  <Link
-                    href={`${base}/details/${detail.id}`}
-                    className="font-medium underline-offset-4 hover:underline"
-                  >
-                    {detail.name}
-                  </Link>
-                  {detail.descriptions && (
-                    <span className="line-clamp-1 text-xs text-admin-muted">
-                      {detail.descriptions}
-                    </span>
-                  )}
-                </td>
-                <td className={`${TABLE.td} text-right tabular-nums`}>
-                  {detail.order}
-                </td>
-                <td className={TABLE.td}>
-                  <StatusDot status={detail.status} />
-                </td>
-                <td className={`${TABLE.td} text-admin-muted whitespace-nowrap`}>
-                  {formatDateTime(detail.updatedAt)}
-                </td>
-                <td className={TABLE.td}>
-                  <div className="flex items-center justify-end gap-2">
-                    <Link
-                      href={`${base}/details/${detail.id}`}
-                      title="Sửa chi tiết"
-                      aria-label="Sửa chi tiết"
-                      className={ICON_BUTTON}
-                    >
-                      <PencilIcon className="size-4" />
-                    </Link>
-                    <form action={toggleCategoryDetailAction}>
-                      <input
-                        type="hidden"
-                        name="categoryId"
-                        value={category.id}
-                      />
-                      <input type="hidden" name="id" value={detail.id} />
-                      <input
-                        type="hidden"
-                        name="status"
-                        value={
-                          detail.status === "active" ? "inactive" : "active"
-                        }
-                      />
-                      <button
-                        type="submit"
-                        className={`${BUTTON.secondary} ${BUTTON_SM}`}
+                  <tr key={detail.id} className={TABLE.tr}>
+                    <td className={TABLE.td}>
+                      <code className={CODE_CHIP}>{detail.code}</code>
+                    </td>
+                    <td className={`${TABLE.td} max-w-xl`}>
+                      <Link
+                        href={`${base}/details/${detail.id}`}
+                        className="font-medium underline-offset-4 hover:underline"
                       >
-                        {detail.status === "active" ? "Tắt" : "Bật"}
-                      </button>
-                    </form>
-                    <DeleteButton
-                      id={detail.id}
-                      fields={{ categoryId: category.id }}
-                      action={deleteCategoryDetailAction}
-                      confirmText={`Xoá chi tiết "${detail.name}"?`}
-                    />
-                  </div>
-                </td>
-              </tr>
+                        {detail.name}
+                      </Link>
+                      {detail.descriptions && (
+                        <span className="line-clamp-1 text-xs text-admin-muted">
+                          {detail.descriptions}
+                        </span>
+                      )}
+                    </td>
+                    <td className={`${TABLE.td} text-right tabular-nums`}>
+                      {detail.order}
+                    </td>
+                    <td className={TABLE.td}>
+                      <StatusDot status={detail.status} />
+                    </td>
+                    <td
+                      className={`${TABLE.td} text-admin-muted whitespace-nowrap`}
+                    >
+                      {formatDateTime(detail.updatedAt)}
+                    </td>
+                    <td className={TABLE.td}>
+                      <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`${base}/details/${detail.id}`}
+                          title={canWrite ? "Sửa chi tiết" : "Xem chi tiết"}
+                          aria-label={
+                            canWrite ? "Sửa chi tiết" : "Xem chi tiết"
+                          }
+                          className={ICON_BUTTON}
+                        >
+                          <PencilIcon className="size-4" />
+                        </Link>
+                        {canWrite && (
+                          <form action={toggleCategoryDetailAction}>
+                            <input
+                              type="hidden"
+                              name="categoryId"
+                              value={category.id}
+                            />
+                            <input type="hidden" name="id" value={detail.id} />
+                            <input
+                              type="hidden"
+                              name="status"
+                              value={
+                                detail.status === "active"
+                                  ? "inactive"
+                                  : "active"
+                              }
+                            />
+                            <button
+                              type="submit"
+                              className={`${BUTTON.secondary} ${BUTTON_SM}`}
+                            >
+                              {detail.status === "active" ? "Tắt" : "Bật"}
+                            </button>
+                          </form>
+                        )}
+                        {canWrite && (
+                          <DeleteButton
+                            id={detail.id}
+                            fields={{ categoryId: category.id }}
+                            action={deleteCategoryDetailAction}
+                            confirmText={`Xoá chi tiết "${detail.name}"?`}
+                          />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 )),
               ],
             )}

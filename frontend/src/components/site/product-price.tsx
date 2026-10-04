@@ -16,7 +16,9 @@ export function ProductPrice({
 
   if (product.price === null) {
     return (
-      <p className={`font-semibold text-gold-700 ${big ? "text-2xl" : "text-lg"}`}>
+      <p
+        className={`font-semibold text-gold-700 ${big ? "text-2xl" : "text-lg"}`}
+      >
         Liên hệ
       </p>
     );
@@ -24,7 +26,9 @@ export function ProductPrice({
 
   if (product.salePrice === null) {
     return (
-      <p className={`font-semibold tabular-nums ${big ? "text-3xl" : "text-lg"}`}>
+      <p
+        className={`font-semibold tabular-nums ${big ? "text-3xl" : "text-lg"}`}
+      >
         {formatVnd(product.price)}
       </p>
     );
@@ -37,7 +41,9 @@ export function ProductPrice({
       >
         {formatVnd(product.salePrice)}
       </p>
-      <s className={`text-black/45 tabular-nums ${big ? "text-base" : "text-sm"}`}>
+      <s
+        className={`text-black/45 tabular-nums ${big ? "text-base" : "text-sm"}`}
+      >
         {formatVnd(product.price)}
       </s>
       <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-600 ring-1 ring-red-200 ring-inset">

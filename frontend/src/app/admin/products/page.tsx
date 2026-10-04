@@ -7,6 +7,8 @@ import { Field, FilterBar, PageHeader } from "@/components/admin/page-header";
 import { Pagination } from "@/components/admin/pagination";
 import { SearchableSelect } from "@/components/admin/searchable-select";
 import { Badge } from "@/components/badge";
+import { can } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { formatDateTime, formatVnd } from "@/lib/format";
 import {
   PRODUCT_SORT_LABELS,
@@ -100,7 +102,21 @@ function StatusAction({ product }: { product: Product }) {
   );
 }
 
-function StockAction({ product }: { product: Product }) {
+function StockAction({
+  product,
+  canWrite,
+}: {
+  product: Product;
+  canWrite: boolean;
+}) {
+  // Không có quyền sửa thì chỉ hiện nhãn, không bấm đổi được.
+  if (!canWrite) {
+    return product.inStock ? (
+      <Badge tone="success">Còn hàng</Badge>
+    ) : (
+      <Badge tone="danger">Hết hàng</Badge>
+    );
+  }
   return (
     <form action={toggleProductStockAction}>
       <input type="hidden" name="id" value={product.id} />
@@ -130,9 +146,10 @@ export default async function AdminProductsPage(
   const params = await props.searchParams;
   const search = pickOne(params.search) ?? "";
   const rawStatus = pickOne(params.status);
-  const status = rawStatus && rawStatus in PRODUCT_STATUS_LABELS
-    ? (rawStatus as ProductStatus)
-    : undefined;
+  const status =
+    rawStatus && rawStatus in PRODUCT_STATUS_LABELS
+      ? (rawStatus as ProductStatus)
+      : undefined;
   const rawCategory = Number(pickOne(params.categoryDetailId));
   const categoryDetailId =
     Number.isInteger(rawCategory) && rawCategory > 0 ? rawCategory : undefined;
@@ -142,7 +159,7 @@ export default async function AdminProductsPage(
     : "updated-desc";
   const page = Number(pickOne(params.page) ?? 1);
 
-  const [result, categories, all] = await Promise.all([
+  const [result, categories, all, user] = await Promise.all([
     listProducts({
       search,
       status,
@@ -153,7 +170,11 @@ export default async function AdminProductsPage(
     listProductCategories(),
     // Ô thống kê nói về toàn hệ thống nên không chịu ảnh hưởng của bộ lọc.
     listProducts({ pageSize: 200 }),
+    currentUser(),
   ]);
+  // Layout chỉ đòi PRODUCTS.READ — ẩn những nút người xem không dùng được.
+  const canWrite = can(user!, "PRODUCTS.WRITE");
+  const canPublish = can(user!, "PRODUCTS.PUBLISH");
 
   const products = result.items;
   const filtered = Boolean(search || status || categoryDetailId);
@@ -168,14 +189,14 @@ export default async function AdminProductsPage(
     { label: "Hết hàng", value: all.items.filter((p) => !p.inStock).length },
   ];
 
-  const addButton = (
+  const addButton = canWrite ? (
     <Link
       href="/admin/products/new"
       className={`${BUTTON.primary} w-full sm:w-auto`}
     >
       + Thêm sản phẩm
     </Link>
-  );
+  ) : undefined;
 
   const emptyState = (
     <EmptyState
@@ -296,7 +317,7 @@ export default async function AdminProductsPage(
 
             <div className="flex items-end justify-between gap-3 border-t border-admin-border/60 pt-3 text-sm">
               <PriceCell product={product} />
-              <StockAction product={product} />
+              <StockAction product={product} canWrite={canWrite} />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -305,14 +326,16 @@ export default async function AdminProductsPage(
                 className={`${BUTTON.secondary} ${BUTTON_SM}`}
               >
                 <PencilIcon className="size-3.5" />
-                Sửa
+                {canWrite ? "Sửa" : "Xem"}
               </Link>
-              <StatusAction product={product} />
-              <DeleteButton
-                id={product.id}
-                action={deleteProductAction}
-                confirmText={`Xoá sản phẩm "${product.name}"? Thao tác này không hoàn tác được.`}
-              />
+              {canPublish && <StatusAction product={product} />}
+              {canWrite && (
+                <DeleteButton
+                  id={product.id}
+                  action={deleteProductAction}
+                  confirmText={`Xoá sản phẩm "${product.name}"? Thao tác này không hoàn tác được.`}
+                />
+              )}
             </div>
           </li>
         ))}
@@ -361,7 +384,9 @@ export default async function AdminProductsPage(
                 <td className={`${TABLE.td} text-right whitespace-nowrap`}>
                   <PriceCell product={product} />
                 </td>
-                <td className={`${TABLE.td} text-admin-muted whitespace-nowrap`}>
+                <td
+                  className={`${TABLE.td} text-admin-muted whitespace-nowrap`}
+                >
                   {product.launchedAt
                     ? new Date(product.launchedAt).toLocaleDateString("vi-VN")
                     : "—"}
@@ -370,27 +395,31 @@ export default async function AdminProductsPage(
                   {statusBadge(product)}
                 </td>
                 <td className={`${TABLE.td} whitespace-nowrap`}>
-                  <StockAction product={product} />
+                  <StockAction product={product} canWrite={canWrite} />
                 </td>
-                <td className={`${TABLE.td} text-admin-muted whitespace-nowrap`}>
+                <td
+                  className={`${TABLE.td} text-admin-muted whitespace-nowrap`}
+                >
                   {formatDateTime(product.updatedAt)}
                 </td>
                 <td className={TABLE.td}>
                   <div className="flex items-center justify-end gap-2">
                     <Link
                       href={`/admin/products/${product.id}`}
-                      title="Sửa sản phẩm"
-                      aria-label="Sửa sản phẩm"
+                      title={canWrite ? "Sửa sản phẩm" : "Xem sản phẩm"}
+                      aria-label={canWrite ? "Sửa sản phẩm" : "Xem sản phẩm"}
                       className={ICON_BUTTON}
                     >
                       <PencilIcon className="size-4" />
                     </Link>
-                    <StatusAction product={product} />
-                    <DeleteButton
-                      id={product.id}
-                      action={deleteProductAction}
-                      confirmText={`Xoá sản phẩm "${product.name}"? Thao tác này không hoàn tác được.`}
-                    />
+                    {canPublish && <StatusAction product={product} />}
+                    {canWrite && (
+                      <DeleteButton
+                        id={product.id}
+                        action={deleteProductAction}
+                        confirmText={`Xoá sản phẩm "${product.name}"? Thao tác này không hoàn tác được.`}
+                      />
+                    )}
                   </div>
                 </td>
               </tr>

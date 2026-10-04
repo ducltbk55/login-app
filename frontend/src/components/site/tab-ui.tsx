@@ -39,7 +39,9 @@ export function TabLabel({
       {icon && (
         <span
           className={`grid size-5 place-items-center transition ${
-            selected ? "text-gold-600" : "text-black/40 group-hover:text-black/60"
+            selected
+              ? "text-gold-600"
+              : "text-black/40 group-hover:text-black/60"
           }`}
           aria-hidden
         >

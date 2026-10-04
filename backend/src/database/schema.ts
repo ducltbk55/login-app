@@ -15,6 +15,12 @@ const TABLE_OPTIONS =
   'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
 
 export const SCHEMA: readonly string[] = [
+  // Migration dữ liệu đã chạy (xem `migrations/index.ts`).
+  `CREATE TABLE IF NOT EXISTS migrations (
+    name VARCHAR(191) NOT NULL PRIMARY KEY,
+    appliedAt VARCHAR(30) NOT NULL
+  ) ${TABLE_OPTIONS}`,
+
   `CREATE TABLE IF NOT EXISTS users (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     accountId VARCHAR(64) NOT NULL,

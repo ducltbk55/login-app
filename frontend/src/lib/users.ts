@@ -172,7 +172,9 @@ export async function updateProfile(
 }
 
 export async function listProvinces(): Promise<AddressOption[]> {
-  const result = await request<{ items: AddressOption[] }>("/address/provinces");
+  const result = await request<{ items: AddressOption[] }>(
+    "/address/provinces",
+  );
   return result.items;
 }
 

@@ -36,7 +36,10 @@ const NAMED_ENTITIES: Record<string, string> = {
  */
 export function textOfHtml(html: string): string {
   return html
-    .replace(/<(br|\/p|\/h\d|\/li|\/td|\/th|\/blockquote|\/figcaption)\b[^>]*>/gi, " ")
+    .replace(
+      /<(br|\/p|\/h\d|\/li|\/td|\/th|\/blockquote|\/figcaption)\b[^>]*>/gi,
+      " ",
+    )
     .replace(/<[^>]*>/g, "")
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, code: string) => {
       if (code[0] !== "#") return NAMED_ENTITIES[code.toLowerCase()] ?? match;

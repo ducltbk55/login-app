@@ -7,26 +7,25 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { AccountMenu, type AdminInfo } from "@/components/admin/account-menu";
 import { AdminNav } from "@/components/admin/admin-nav";
+import type { AdminMenuItem } from "@/lib/access";
 import {
   CloseIcon,
   LockIcon,
   MenuIcon,
   PanelLeftIcon,
 } from "@/components/admin/icons";
-import {
-  COMPANY_LOGO,
-  COMPANY_NAME,
-  COMPANY_SHORT_NAME,
-} from "@/lib/company";
+import { COMPANY_LOGO, COMPANY_NAME, COMPANY_SHORT_NAME } from "@/lib/company";
 
 /** Nhớ trạng thái thu gọn giữa các lần tải trang. */
 const COLLAPSE_COOKIE = "admin_sidebar";
 
 function SidebarContent({
+  menu,
   collapsed,
   onNavigate,
   onToggleCollapse,
 }: {
+  menu: AdminMenuItem[];
   collapsed: boolean;
   onNavigate?: () => void;
   /** Chỉ có ở sidebar desktop; ngăn kéo mobile luôn ở dạng đầy đủ. */
@@ -76,7 +75,7 @@ function SidebarContent({
       </div>
 
       <div className="flex-1">
-        <AdminNav collapsed={collapsed} onNavigate={onNavigate} />
+        <AdminNav items={menu} collapsed={collapsed} onNavigate={onNavigate} />
       </div>
     </div>
   );
@@ -89,11 +88,14 @@ function SidebarContent({
  */
 export function AdminShell({
   admin,
+  menu,
   signOutSlot,
   initialCollapsed,
   children,
 }: {
   admin: AdminInfo;
+  /** Mục menu theo chức năng mà người dùng có quyền xem (dựng ở layout). */
+  menu: AdminMenuItem[];
   signOutSlot: ReactNode;
   /** Đọc từ cookie ở layout nên không bị nhấp nháy khi tải trang. */
   initialCollapsed: boolean;
@@ -135,6 +137,7 @@ export function AdminShell({
         }`}
       >
         <SidebarContent
+          menu={menu}
           collapsed={collapsed}
           onToggleCollapse={toggleCollapsed}
         />
@@ -164,6 +167,7 @@ export function AdminShell({
               <CloseIcon className="size-5" />
             </button>
             <SidebarContent
+              menu={menu}
               collapsed={false}
               onNavigate={() => setOpen(false)}
             />

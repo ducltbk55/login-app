@@ -18,6 +18,7 @@ import {
   PERMISSION_CATEGORY_NAME,
   PERMISSION_SEEDS,
   permissionGroupOf,
+  type FunctionDef,
   type PermissionDef,
 } from '../common/permissions';
 
@@ -226,6 +227,24 @@ export class PermissionCatalogService implements OnModuleInit {
         group: detail.group?.name ?? permissionGroupOf(detail.code),
         label: detail.name,
         description: detail.descriptions,
+      }),
+    );
+  }
+
+  /**
+   * Chức năng đang bật (chi tiết của danh mục chức năng), theo thứ tự hiển
+   * thị. Frontend dựng menu quản trị từ đây: đổi tên/thứ tự/tắt một chức
+   * năng trong Danh mục là menu đổi theo.
+   */
+  async functions(): Promise<FunctionDef[]> {
+    const category = await this.findByCode(FUNCTION_CATEGORY_CODE);
+    if (!category) return [];
+
+    return (await this.details.list(category.id, { status: 'active' })).map(
+      (detail) => ({
+        code: detail.code,
+        label: detail.name,
+        order: detail.order,
       }),
     );
   }

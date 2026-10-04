@@ -53,9 +53,7 @@ function AttachmentField() {
     if (!picked) return clear();
 
     if (picked.size > MAX_ATTACHMENT_BYTES) {
-      setError(
-        `Tệp nặng ${formatBytes(picked.size)}, vượt quá giới hạn 5MB.`,
-      );
+      setError(`Tệp nặng ${formatBytes(picked.size)}, vượt quá giới hạn 5MB.`);
       setFile(null);
       return;
     }
@@ -153,9 +151,17 @@ export function ContactForm({
   return (
     <form action={formAction} className="space-y-4">
       {/* Bẫy bot: người thật không nhìn thấy nên không bao giờ điền */}
-      <div aria-hidden className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
+      <div
+        aria-hidden
+        className="absolute left-[-9999px] h-0 w-0 overflow-hidden"
+      >
         <label htmlFor="contact-website">Để trống ô này</label>
-        <input id="contact-website" name="website" tabIndex={-1} autoComplete="off" />
+        <input
+          id="contact-website"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

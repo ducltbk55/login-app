@@ -1,6 +1,7 @@
 import { ProductForm } from "@/components/admin/product-form";
 import { BackLink, PageHeader } from "@/components/admin/page-header";
-import { requireAdmin } from "@/lib/admin";
+import { can } from "@/lib/access";
+import { requirePermission } from "@/lib/admin";
 import { listProductCategories, listSpecLabels } from "@/lib/products";
 import { createProductAction } from "../actions";
 
@@ -8,8 +9,8 @@ export const metadata = { title: "Thêm sản phẩm" };
 
 export default async function NewProductPage() {
   // Chỉ lĩnh vực đang bật — gán vào lĩnh vực đã tắt thì backend chặn.
-  const [, categories, specSuggestions] = await Promise.all([
-    requireAdmin(),
+  const [admin, categories, specSuggestions] = await Promise.all([
+    requirePermission("PRODUCTS.WRITE"),
     listProductCategories(),
     listSpecLabels(),
   ]);
@@ -24,6 +25,7 @@ export default async function NewProductPage() {
       <ProductForm
         categories={categories}
         specSuggestions={specSuggestions}
+        canPublish={can(admin, "PRODUCTS.PUBLISH")}
         action={createProductAction}
         cancelHref="/admin/products"
         submitLabel="Tạo sản phẩm"

@@ -69,6 +69,23 @@ describe('PermissionCatalogService', () => {
     ).toEqual(PERMISSION_SEEDS.map((s) => s.code).sort());
   });
 
+  it('functions(): chức năng đang bật theo thứ tự, nhãn sửa được', async () => {
+    expect((await catalog.functions()).map((f) => f.code)).toEqual(
+      FUNCTION_SEEDS.map((s) => s.code),
+    );
+
+    const category = await functionCategory();
+    const all = await details.list(category.id);
+    const articles = all.find((d) => d.code === 'ARTICLES')!;
+    const orders = all.find((d) => d.code === 'ORDERS')!;
+    await details.update(category.id, articles.id, { name: 'Tin tức' });
+    await details.update(category.id, orders.id, { status: 'inactive' });
+
+    const functions = await catalog.functions();
+    expect(functions.find((f) => f.code === 'ARTICLES')?.label).toBe('Tin tức');
+    expect(functions.some((f) => f.code === 'ORDERS')).toBe(false);
+  });
+
   it('mỗi quyền thuộc đúng chức năng, nhãn nhóm là tên tiếng Việt', async () => {
     const byKey = new Map((await catalog.list()).map((p) => [p.key, p]));
 

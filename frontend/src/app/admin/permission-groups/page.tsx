@@ -8,14 +8,19 @@ import {
   findPermissionCatalogHref,
   listPermissionGroups,
 } from "@/lib/permission-groups";
+import { can } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { BUTTON, BUTTON_SM, CODE_CHIP, ROW_CARD, TABLE } from "@/lib/styles";
 import { deletePermissionGroupAction } from "./actions";
 
 export default async function AdminPermissionGroupsPage() {
-  const [groups, catalogHref] = await Promise.all([
+  const [groups, catalogHref, user] = await Promise.all([
     listPermissionGroups(),
     findPermissionCatalogHref(),
+    currentUser(),
   ]);
+  // Layout chỉ đòi PERMISSION-GROUPS.READ — thêm/sửa/xoá cần WRITE.
+  const canWrite = can(user!, "PERMISSION-GROUPS.WRITE");
 
   return (
     <div className="space-y-5">
@@ -32,12 +37,14 @@ export default async function AdminPermissionGroupsPage() {
               <ListIcon className="size-4" />
               Danh mục quyền
             </Link>
-            <Link
-              href="/admin/permission-groups/new"
-              className={`${BUTTON.primary} w-full sm:w-auto`}
-            >
-              + Thêm nhóm
-            </Link>
+            {canWrite && (
+              <Link
+                href="/admin/permission-groups/new"
+                className={`${BUTTON.primary} w-full sm:w-auto`}
+              >
+                + Thêm nhóm
+              </Link>
+            )}
           </div>
         }
       />
@@ -84,13 +91,15 @@ export default async function AdminPermissionGroupsPage() {
                 href={`/admin/permission-groups/${group.id}`}
                 className={`${BUTTON.secondary} ${BUTTON_SM}`}
               >
-                Sửa
+                {canWrite ? "Sửa" : "Xem"}
               </Link>
-              <DeleteButton
-                id={group.id}
-                action={deletePermissionGroupAction}
-                confirmText={`Xoá nhóm "${group.name}"? ${group.memberCount} người dùng sẽ mất quyền từ nhóm này.`}
-              />
+              {canWrite && (
+                <DeleteButton
+                  id={group.id}
+                  action={deletePermissionGroupAction}
+                  confirmText={`Xoá nhóm "${group.name}"? ${group.memberCount} người dùng sẽ mất quyền từ nhóm này.`}
+                />
+              )}
             </div>
           </li>
         ))}
@@ -151,13 +160,15 @@ export default async function AdminPermissionGroupsPage() {
                       href={`/admin/permission-groups/${group.id}`}
                       className={`${BUTTON.secondary} ${BUTTON_SM}`}
                     >
-                      Sửa
+                      {canWrite ? "Sửa" : "Xem"}
                     </Link>
-                    <DeleteButton
-                      id={group.id}
-                      action={deletePermissionGroupAction}
-                      confirmText={`Xoá nhóm "${group.name}"? ${group.memberCount} người dùng sẽ mất quyền từ nhóm này.`}
-                    />
+                    {canWrite && (
+                      <DeleteButton
+                        id={group.id}
+                        action={deletePermissionGroupAction}
+                        confirmText={`Xoá nhóm "${group.name}"? ${group.memberCount} người dùng sẽ mất quyền từ nhóm này.`}
+                      />
+                    )}
                   </div>
                 </td>
               </tr>

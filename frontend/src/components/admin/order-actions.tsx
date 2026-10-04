@@ -69,7 +69,10 @@ function TransitionForm<T extends string>({
   field: "status" | "paymentStatus";
   options: T[];
   labels: Record<T, string>;
-  action: (state: OrderActionState, formData: FormData) => Promise<OrderActionState>;
+  action: (
+    state: OrderActionState,
+    formData: FormData,
+  ) => Promise<OrderActionState>;
   /** Bước bắt buộc ghi lý do (huỷ đơn). */
   requireNoteFor?: T;
   emptyText: string;
@@ -108,7 +111,9 @@ function TransitionForm<T extends string>({
         <div className="space-y-3 rounded-lg border border-admin-border bg-admin-surface-2 p-3">
           <label className="block text-sm">
             <span className="mb-1.5 block text-xs font-medium text-admin-muted">
-              {needsNote ? "Lý do huỷ *" : "Ghi chú (tuỳ chọn) — lưu vào lịch sử"}
+              {needsNote
+                ? "Lý do huỷ *"
+                : "Ghi chú (tuỳ chọn) — lưu vào lịch sử"}
             </span>
             <textarea
               name="note"

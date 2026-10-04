@@ -2,12 +2,15 @@ import { notFound } from "next/navigation";
 
 import { CategoryForm } from "@/components/admin/category-form";
 import { BackLink, PageHeader } from "@/components/admin/page-header";
+import { requirePermission } from "@/lib/admin";
 import { findCategory, listAllCategoryDetails } from "@/lib/categories";
 import { createCategoryDetailAction } from "../../../actions";
 
 export default async function NewCategoryDetailPage(
   props: PageProps<"/admin/categories/[id]/details/new">,
 ) {
+  await requirePermission("CATEGORIES.WRITE");
+
   const { id } = await props.params;
   const category = await findCategory(id);
 
@@ -18,13 +21,13 @@ export default async function NewCategoryDetailPage(
     ? await findCategory(category.groupCategoryId)
     : null;
   const groupDetailOptions = groupCategory
-    ? (await listAllCategoryDetails(groupCategory.id, { status: "active" })).map(
-        (detail) => ({
-          id: detail.id,
-          code: detail.code,
-          name: detail.name,
-        }),
-      )
+    ? (
+        await listAllCategoryDetails(groupCategory.id, { status: "active" })
+      ).map((detail) => ({
+        id: detail.id,
+        code: detail.code,
+        name: detail.name,
+      }))
     : undefined;
 
   const base = `/admin/categories/${encodeURIComponent(id)}/details`;

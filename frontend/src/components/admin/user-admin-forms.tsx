@@ -31,9 +31,15 @@ function Notice({ state }: { state: ActionState }) {
 export function RoleStatusForm({
   user,
   action,
+  canChangeRole = true,
 }: {
   user: StoredUserDetail;
   action: Action;
+  /**
+   * Chỉ admin mới đổi được vai trò. Thiếu quyền thì ô vai trò bị khoá với đúng
+   * một lựa chọn là vai trò hiện tại — vẫn được gửi lên để server so khớp.
+   */
+  canChangeRole?: boolean;
 }) {
   const [state, formAction] = useActionState(action, null);
 
@@ -47,11 +53,21 @@ export function RoleStatusForm({
           <SearchableSelect
             name="role"
             defaultValue={user.role}
-            options={[
-              { value: "user", label: "user" },
-              { value: "admin", label: "admin" },
-            ]}
+            disabled={!canChangeRole}
+            options={
+              canChangeRole
+                ? [
+                    { value: "user", label: "user" },
+                    { value: "admin", label: "admin" },
+                  ]
+                : [{ value: user.role, label: user.role }]
+            }
           />
+          {!canChangeRole && (
+            <span className="mt-1.5 block text-xs text-admin-muted">
+              Chỉ quản trị viên mới đổi được vai trò.
+            </span>
+          )}
         </div>
         <div className="text-sm">
           <span className={`mb-1.5 block ${LABEL_TEXT}`}>Trạng thái</span>

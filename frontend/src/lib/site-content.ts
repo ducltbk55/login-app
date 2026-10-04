@@ -152,9 +152,24 @@ export const CORE_VALUES = [
 ];
 
 export const MILESTONES = [
-  { year: "2022", text: "Thành lập công ty tại Đà Nẵng, tập trung phát triển phần mềm theo yêu cầu." },
-  { year: "2023", text: "Mở rộng đội ngũ, triển khai những hệ thống quản trị đầu tiên cho khách hàng doanh nghiệp." },
-  { year: "2024", text: "Bổ sung mảng hạ tầng và vận hành, nhận bảo trì hệ thống dài hạn." },
-  { year: "2025", text: "Chuẩn hoá quy trình phát triển, áp dụng kiểm thử tự động cho toàn bộ dự án." },
-  { year: "2026", text: "Đưa bộ giải pháp quản trị danh mục và phân quyền dùng chung vào khai thác." },
+  {
+    year: "2022",
+    text: "Thành lập công ty tại Đà Nẵng, tập trung phát triển phần mềm theo yêu cầu.",
+  },
+  {
+    year: "2023",
+    text: "Mở rộng đội ngũ, triển khai những hệ thống quản trị đầu tiên cho khách hàng doanh nghiệp.",
+  },
+  {
+    year: "2024",
+    text: "Bổ sung mảng hạ tầng và vận hành, nhận bảo trì hệ thống dài hạn.",
+  },
+  {
+    year: "2025",
+    text: "Chuẩn hoá quy trình phát triển, áp dụng kiểm thử tự động cho toàn bộ dự án.",
+  },
+  {
+    year: "2026",
+    text: "Đưa bộ giải pháp quản trị danh mục và phân quyền dùng chung vào khai thác.",
+  },
 ];

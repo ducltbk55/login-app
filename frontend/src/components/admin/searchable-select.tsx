@@ -77,7 +77,12 @@ export function SearchableSelect({
 
   const openMenu = () => {
     setQuery("");
-    setActiveIndex(Math.max(0, options.findIndex((o) => o.value === value)));
+    setActiveIndex(
+      Math.max(
+        0,
+        options.findIndex((o) => o.value === value),
+      ),
+    );
     setOpen(true);
   };
 

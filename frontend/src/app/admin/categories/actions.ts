@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { requireAdmin } from "@/lib/admin";
+import { requirePermission } from "@/lib/admin";
 import { BackendError } from "@/lib/backend";
 import {
   createCategory,
@@ -134,7 +134,7 @@ export async function createCategoryAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  await requirePermission("CATEGORIES.WRITE");
 
   const input = readCategoryForm(formData);
   if ("error" in input) return input;
@@ -147,7 +147,7 @@ export async function updateCategoryAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  await requirePermission("CATEGORIES.WRITE");
 
   const input = readCategoryForm(formData);
   if ("error" in input) return input;
@@ -157,7 +157,7 @@ export async function updateCategoryAction(
 
 /** Bật/tắt nhanh từ danh sách, không cần vào trang sửa. */
 export async function toggleCategoryAction(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requirePermission("CATEGORIES.WRITE");
 
   const id = String(formData.get("id") ?? "");
   const status = formData.get("status") === "active" ? "active" : "inactive";
@@ -170,7 +170,7 @@ export async function deleteCategoryAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  await requirePermission("CATEGORIES.WRITE");
 
   return remove(() => deleteCategory(String(formData.get("id") ?? "")));
 }
@@ -182,7 +182,7 @@ export async function createCategoryDetailAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  await requirePermission("CATEGORIES.WRITE");
 
   const input = readDetailForm(formData);
   if ("error" in input) return input;
@@ -199,7 +199,7 @@ export async function updateCategoryDetailAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  await requirePermission("CATEGORIES.WRITE");
 
   const input = readDetailForm(formData);
   if ("error" in input) return input;
@@ -213,7 +213,7 @@ export async function updateCategoryDetailAction(
 export async function toggleCategoryDetailAction(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  await requirePermission("CATEGORIES.WRITE");
 
   const categoryId = String(formData.get("categoryId") ?? "");
   const id = String(formData.get("id") ?? "");
@@ -227,7 +227,7 @@ export async function deleteCategoryDetailAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  await requirePermission("CATEGORIES.WRITE");
 
   return remove(() =>
     deleteCategoryDetail(

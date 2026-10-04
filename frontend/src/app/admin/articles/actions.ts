@@ -3,12 +3,14 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { requireAdmin } from "@/lib/admin";
+import { can } from "@/lib/access";
+import { requirePermission } from "@/lib/admin";
 import { BackendError } from "@/lib/backend";
 import {
   ARTICLE_STATUSES,
   createArticle,
   deleteArticle,
+  findArticle,
   updateArticle,
   type ArticleStatus,
   type SaveArticleInput,
@@ -27,7 +29,9 @@ function text(formData: FormData, field: string): string {
  * duyệt hiểu là giờ địa phương. `new Date()` cũng diễn giải đúng như vậy rồi
  * đổi sang ISO, nên giờ admin nhìn thấy chính là giờ bài được đăng.
  */
-function readPublishedAt(formData: FormData): string | null | { error: string } {
+function readPublishedAt(
+  formData: FormData,
+): string | null | { error: string } {
   const raw = text(formData, "publishedAt");
   if (raw === "") return null;
 
@@ -78,6 +82,10 @@ function readForm(formData: FormData): SaveArticleInput | { error: string } {
   };
 }
 
+const PUBLISH_DENIED: FormState = {
+  error: "Bạn không có quyền xuất bản / gỡ bài viết — hãy lưu ở dạng nháp.",
+};
+
 /** Lỗi nghiệp vụ hiện trên form thay vì làm vỡ cả trang. */
 async function save(
   work: () => Promise<unknown>,
@@ -98,10 +106,14 @@ export async function createArticleAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  const user = await requirePermission("ARTICLES.WRITE");
 
   const input = readForm(formData);
   if ("error" in input) return input;
+  // Viết bài là WRITE; đăng thẳng (hoặc lưu trữ) ngay khi tạo là PUBLISH.
+  if (input.status !== "draft" && !can(user, "ARTICLES.PUBLISH")) {
+    return PUBLISH_DENIED;
+  }
 
   return save(() => createArticle(input), LIST_PATH);
 }
@@ -111,10 +123,15 @@ export async function updateArticleAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  const user = await requirePermission("ARTICLES.WRITE");
 
   const input = readForm(formData);
   if ("error" in input) return input;
+  // Sửa nội dung bài đã đăng chỉ cần WRITE; đổi trạng thái mới cần PUBLISH.
+  if (!can(user, "ARTICLES.PUBLISH")) {
+    const current = await findArticle(id);
+    if (current && current.status !== input.status) return PUBLISH_DENIED;
+  }
 
   return save(() => updateArticle(id, input), LIST_PATH);
 }
@@ -126,7 +143,7 @@ export async function updateArticleAction(
 export async function setArticleStatusAction(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  await requirePermission("ARTICLES.PUBLISH");
 
   const id = text(formData, "id");
   const raw = text(formData, "status");
@@ -142,7 +159,7 @@ export async function setArticleStatusAction(
 export async function toggleArticleFeaturedAction(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  await requirePermission("ARTICLES.WRITE");
 
   await updateArticle(text(formData, "id"), {
     featured: text(formData, "featured") === "true",
@@ -154,7 +171,7 @@ export async function deleteArticleAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  await requirePermission("ARTICLES.WRITE");
 
   try {
     await deleteArticle(text(formData, "id"));

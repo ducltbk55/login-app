@@ -36,7 +36,7 @@ export function SiteFooter() {
           </div>
           <p className="mt-4 max-w-md text-sm">
             Thành lập năm {COMPANY_PROFILE.foundedYear} tại Đà Nẵng, chúng tôi
-            xây dựng và vận hành các hệ thống {" "}
+            xây dựng và vận hành các hệ thống{" "}
             {COMPANY_PROFILE.industry.toLowerCase()} cho doanh nghiệp.
           </p>
         </div>
@@ -46,7 +46,10 @@ export function SiteFooter() {
           <ul className="mt-4 space-y-2 text-sm">
             {NAV_ITEMS.map((item) => (
               <li key={item.href}>
-                <Link href={item.href} className="transition hover:text-gold-300">
+                <Link
+                  href={item.href}
+                  className="transition hover:text-gold-300"
+                >
                   {item.label}
                 </Link>
               </li>

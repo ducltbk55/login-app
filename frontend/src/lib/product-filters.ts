@@ -45,4 +45,3 @@ export function productsHref(values: ProductFilterValues, page = 1): string {
   if (page > 1) query.set(PARAM.page, String(page));
   return query.size > 0 ? `/san-pham?${query}` : "/san-pham";
 }
-

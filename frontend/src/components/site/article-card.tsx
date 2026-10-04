@@ -91,9 +91,7 @@ export function FeaturedArticleCard({ article }: { article: Article }) {
             {article.title}
           </h2>
           <p className="mt-3 text-black/65">{excerptOf(article, 260)}</p>
-          <p className="mt-5 text-sm font-medium text-gold-700">
-            Đọc tiếp →
-          </p>
+          <p className="mt-5 text-sm font-medium text-gold-700">Đọc tiếp →</p>
         </div>
       </Link>
     </article>

@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 
 import { ApiKeyGuard } from '../common/api-key.guard';
-import type { PermissionDef } from '../common/permissions';
+import type { FunctionDef, PermissionDef } from '../common/permissions';
 import { PermissionCatalogService } from './permission-catalog.service';
 import {
   CreatePermissionGroupDto,
@@ -33,6 +33,12 @@ export class PermissionGroupsController {
   @Get('permissions')
   async permissions(): Promise<{ items: PermissionDef[] }> {
     return { items: await this.catalog.list() };
+  }
+
+  /** Chức năng đang bật, theo thứ tự — frontend dựng menu quản trị từ đây. */
+  @Get('permissions/functions')
+  async functions(): Promise<{ items: FunctionDef[] }> {
+    return { items: await this.catalog.functions() };
   }
 
   @Get('permission-groups')

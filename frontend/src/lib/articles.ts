@@ -90,9 +90,7 @@ export async function findArticle(
   return requestOptional<Article>(`/articles/${segment(id)}`);
 }
 
-export async function findArticleBySlug(
-  slug: string,
-): Promise<Article | null> {
+export async function findArticleBySlug(slug: string): Promise<Article | null> {
   return requestOptional<Article>(`/articles/slug/${segment(slug)}`);
 }
 
@@ -113,9 +111,7 @@ export async function articleCountsByCategory(
   return request<Record<number, number>>(`/articles/counts?live=${live}`);
 }
 
-export async function createArticle(
-  input: SaveArticleInput,
-): Promise<Article> {
+export async function createArticle(input: SaveArticleInput): Promise<Article> {
   return request<Article>("/articles", {
     method: "POST",
     body: JSON.stringify(input),

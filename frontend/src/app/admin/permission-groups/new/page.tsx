@@ -1,5 +1,6 @@
 import { BackLink, PageHeader } from "@/components/admin/page-header";
 import { PermissionGroupForm } from "@/components/admin/permission-group-form";
+import { requirePermission } from "@/lib/admin";
 import {
   findPermissionCatalogHref,
   listPermissions,
@@ -7,6 +8,8 @@ import {
 import { createPermissionGroupAction } from "../actions";
 
 export default async function NewPermissionGroupPage() {
+  await requirePermission("PERMISSION-GROUPS.WRITE");
+
   const [permissions, catalogHref] = await Promise.all([
     listPermissions(),
     findPermissionCatalogHref(),
@@ -27,3 +30,4 @@ export default async function NewPermissionGroupPage() {
     </div>
   );
 }
+

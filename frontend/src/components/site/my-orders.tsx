@@ -34,7 +34,9 @@ function Progress({ status }: { status: OrderStatus }) {
               index <= current ? "bg-gold-500" : "bg-black/10"
             }`}
           />
-          <span className={`mt-1 block ${index === current ? "font-semibold text-black/80" : ""}`}>
+          <span
+            className={`mt-1 block ${index === current ? "font-semibold text-black/80" : ""}`}
+          >
             {ORDER_STATUS_LABELS[step]}
           </span>
         </li>
@@ -52,7 +54,10 @@ export function MyOrders({ orders }: { orders: Order[] }) {
     return (
       <p className="text-sm text-black/55">
         Bạn chưa có đơn hàng nào.{" "}
-        <Link href="/san-pham" className="font-medium text-gold-700 underline underline-offset-4">
+        <Link
+          href="/san-pham"
+          className="font-medium text-gold-700 underline underline-offset-4"
+        >
           Xem sản phẩm
         </Link>
       </p>
@@ -66,7 +71,9 @@ export function MyOrders({ orders }: { orders: Order[] }) {
           <details className="group rounded-xl border border-black/10 open:bg-gold-50/40">
             <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
               <span>
-                <span className="font-mono text-sm font-semibold">{order.code}</span>
+                <span className="font-mono text-sm font-semibold">
+                  {order.code}
+                </span>
                 <span className="ml-2 text-xs text-black/50">
                   {formatDateTime(order.createdAt)}
                 </span>
@@ -80,7 +87,9 @@ export function MyOrders({ orders }: { orders: Order[] }) {
                 >
                   {ORDER_STATUS_LABELS[order.status]}
                 </span>
-                <span className="text-black/40 transition group-open:rotate-180">▾</span>
+                <span className="text-black/40 transition group-open:rotate-180">
+                  ▾
+                </span>
               </span>
             </summary>
 
@@ -101,7 +110,9 @@ export function MyOrders({ orders }: { orders: Order[] }) {
                       )}{" "}
                       <span className="text-black/50">× {item.quantity}</span>
                     </span>
-                    <span className="tabular-nums">{formatVnd(item.lineTotal)}</span>
+                    <span className="tabular-nums">
+                      {formatVnd(item.lineTotal)}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -115,8 +126,13 @@ export function MyOrders({ orders }: { orders: Order[] }) {
                 order.paymentStatus === "unpaid" &&
                 order.status !== "cancelled" && (
                   <div className="mt-4">
-                    <p className="mb-2 text-xs font-semibold">Thông tin chuyển khoản</p>
-                    <BankTransferInfo orderCode={order.code} amount={order.total} />
+                    <p className="mb-2 text-xs font-semibold">
+                      Thông tin chuyển khoản
+                    </p>
+                    <BankTransferInfo
+                      orderCode={order.code}
+                      amount={order.total}
+                    />
                   </div>
                 )}
             </div>

@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { requireAdmin } from "@/lib/admin";
+import { requirePermission } from "@/lib/admin";
 import { BackendError } from "@/lib/backend";
 import {
   CONTACT_STATUSES,
@@ -31,7 +31,7 @@ function readStatus(raw: string): ContactStatus | undefined {
 export async function setContactStatusAction(
   formData: FormData,
 ): Promise<void> {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("CONTACTS.WRITE");
 
   const status = readStatus(text(formData, "status"));
   if (!status) return;
@@ -45,7 +45,7 @@ export async function saveContactNoteAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("CONTACTS.WRITE");
 
   const status = readStatus(text(formData, "status"));
 
@@ -67,7 +67,7 @@ export async function deleteContactAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  await requirePermission("CONTACTS.WRITE");
 
   try {
     await deleteContact(text(formData, "id"));

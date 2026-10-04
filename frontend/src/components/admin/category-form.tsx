@@ -82,6 +82,7 @@ export function CategoryForm({
   groupCategoryOptions,
   groupDetailOptions,
   groupCategoryName,
+  readOnly = false,
 }: {
   /** Có `record` là sửa, không có là thêm mới. */
   record?: Category;
@@ -95,6 +96,8 @@ export function CategoryForm({
   groupDetailOptions?: GroupOption[];
   /** Tên danh mục nhóm, dùng làm nhãn cho ô chọn ở form chi tiết. */
   groupCategoryName?: string;
+  /** Chỉ xem (thiếu CATEGORIES.WRITE): khoá mọi ô và ẩn nút lưu. */
+  readOnly?: boolean;
 }) {
   const [state, formAction] = useActionState(action, null);
   // `record` của form chi tiết là CategoryDetail nên mới có groupDetailId.
@@ -105,116 +108,124 @@ export function CategoryForm({
 
   return (
     <form action={formAction} className="space-y-5">
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="space-y-5 xl:col-span-2">
-          <CardSection
-            title="Nội dung"
-            description="Thông tin hiển thị cho người dùng."
-          >
-            <label className="block text-sm">
-              <span className={`mb-1.5 block ${LABEL_TEXT}`}>Tên *</span>
-              <input
-                name="name"
-                required
-                maxLength={120}
-                defaultValue={record?.name}
-                placeholder="Ví dụ: Đồ gia dụng"
-                className={`${INPUT} text-base`}
-              />
-            </label>
-
-            <label className="block text-sm">
-              <span className={`mb-1.5 block ${LABEL_TEXT}`}>Mô tả</span>
-              <textarea
-                name="descriptions"
-                rows={8}
-                maxLength={500}
-                defaultValue={record?.descriptions ?? ""}
-                placeholder="Mô tả ngắn gọn để người khác hiểu danh mục này dùng cho việc gì."
-                className={`${INPUT} resize-y`}
-              />
-              <span className="mt-1.5 block text-xs text-admin-muted">
-                Tối đa 500 ký tự.
-              </span>
-            </label>
-          </CardSection>
-        </div>
-
-        <div className="space-y-5">
-          <CardSection title="Định danh">
-            <label className="block text-sm">
-              <span className={`mb-1.5 block ${LABEL_TEXT}`}>Mã (code)</span>
-              <input
-                name="code"
-                maxLength={60}
-                pattern="[A-Za-z0-9][A-Za-z0-9_.-]*"
-                defaultValue={record?.code}
-                placeholder="tự sinh từ tên"
-                className={`${INPUT} font-mono tracking-wide uppercase`}
-              />
-              <span className="mt-1.5 block text-xs text-admin-muted">
-                {codeHint}
-              </span>
-            </label>
-          </CardSection>
-
-          <CardSection title="Hiển thị">
-            <label className="block text-sm">
-              <span className={`mb-1.5 block ${LABEL_TEXT}`}>Thứ tự</span>
-              <input
-                name="order"
-                type="number"
-                step={1}
-                defaultValue={record?.order ?? 1}
-                className={INPUT}
-              />
-              <span className="mt-1.5 block text-xs text-admin-muted">
-                Số nhỏ hiện trước, đánh số từ 1.
-              </span>
-            </label>
-
-            <StatusToggle defaultOn={(record?.status ?? "active") === "active"} />
-          </CardSection>
-
-          {groupCategoryOptions && (
+      <fieldset disabled={readOnly} className="min-w-0">
+        <div className="grid gap-5 xl:grid-cols-3">
+          <div className="space-y-5 xl:col-span-2">
             <CardSection
-              title="Phân nhóm"
-              description="Áp dụng cho chi tiết của danh mục này."
+              title="Nội dung"
+              description="Thông tin hiển thị cho người dùng."
             >
-              <GroupCategoryField
-                options={groupCategoryOptions}
-                defaultValue={record?.groupCategoryId ?? null}
+              <label className="block text-sm">
+                <span className={`mb-1.5 block ${LABEL_TEXT}`}>Tên *</span>
+                <input
+                  name="name"
+                  required
+                  maxLength={120}
+                  defaultValue={record?.name}
+                  placeholder="Ví dụ: Đồ gia dụng"
+                  className={`${INPUT} text-base`}
+                />
+              </label>
+
+              <label className="block text-sm">
+                <span className={`mb-1.5 block ${LABEL_TEXT}`}>Mô tả</span>
+                <textarea
+                  name="descriptions"
+                  rows={8}
+                  maxLength={500}
+                  defaultValue={record?.descriptions ?? ""}
+                  placeholder="Mô tả ngắn gọn để người khác hiểu danh mục này dùng cho việc gì."
+                  className={`${INPUT} resize-y`}
+                />
+                <span className="mt-1.5 block text-xs text-admin-muted">
+                  Tối đa 500 ký tự.
+                </span>
+              </label>
+            </CardSection>
+          </div>
+
+          <div className="space-y-5">
+            <CardSection title="Định danh">
+              <label className="block text-sm">
+                <span className={`mb-1.5 block ${LABEL_TEXT}`}>Mã (code)</span>
+                <input
+                  name="code"
+                  maxLength={60}
+                  pattern="[A-Za-z0-9][A-Za-z0-9_.-]*"
+                  defaultValue={record?.code}
+                  placeholder="tự sinh từ tên"
+                  className={`${INPUT} font-mono tracking-wide uppercase`}
+                />
+                <span className="mt-1.5 block text-xs text-admin-muted">
+                  {codeHint}
+                </span>
+              </label>
+            </CardSection>
+
+            <CardSection title="Hiển thị">
+              <label className="block text-sm">
+                <span className={`mb-1.5 block ${LABEL_TEXT}`}>Thứ tự</span>
+                <input
+                  name="order"
+                  type="number"
+                  step={1}
+                  defaultValue={record?.order ?? 1}
+                  className={INPUT}
+                />
+                <span className="mt-1.5 block text-xs text-admin-muted">
+                  Số nhỏ hiện trước, đánh số từ 1.
+                </span>
+              </label>
+
+              <StatusToggle
+                defaultOn={(record?.status ?? "active") === "active"}
               />
             </CardSection>
-          )}
 
-          {groupDetailOptions && (
-            <CardSection title={`Nhóm theo ${groupCategoryName ?? "danh mục cha"}`}>
-              <div className="block text-sm">
-                <span className={`mb-1.5 block ${LABEL_TEXT}`}>
-                  Thuộc nhóm *
-                </span>
-                <SearchableSelect
-                  name="groupDetailId"
-                  required
-                  options={toSelectOptions(groupDetailOptions)}
-                  defaultValue={
-                    groupDetailDefault === null ? "" : String(groupDetailDefault)
-                  }
-                  placeholder="— Chọn nhóm —"
-                  searchPlaceholder="Tìm theo tên hoặc mã…"
-                  emptyLabel="Danh mục nhóm chưa có chi tiết nào"
+            {groupCategoryOptions && (
+              <CardSection
+                title="Phân nhóm"
+                description="Áp dụng cho chi tiết của danh mục này."
+              >
+                <GroupCategoryField
+                  options={groupCategoryOptions}
+                  defaultValue={record?.groupCategoryId ?? null}
                 />
-                {groupDetailOptions.length === 0 && (
-                  <span className="mt-1.5 block text-xs text-red-600 dark:text-red-400">
-                    Danh mục nhóm chưa có chi tiết nào — hãy thêm ở đó trước.
+              </CardSection>
+            )}
+
+            {groupDetailOptions && (
+              <CardSection
+                title={`Nhóm theo ${groupCategoryName ?? "danh mục cha"}`}
+              >
+                <div className="block text-sm">
+                  <span className={`mb-1.5 block ${LABEL_TEXT}`}>
+                    Thuộc nhóm *
                   </span>
-                )}
-              </div>
-            </CardSection>
-          )}
+                  <SearchableSelect
+                    name="groupDetailId"
+                    required
+                    options={toSelectOptions(groupDetailOptions)}
+                    defaultValue={
+                      groupDetailDefault === null
+                        ? ""
+                        : String(groupDetailDefault)
+                    }
+                    placeholder="— Chọn nhóm —"
+                    searchPlaceholder="Tìm theo tên hoặc mã…"
+                    emptyLabel="Danh mục nhóm chưa có chi tiết nào"
+                  />
+                  {groupDetailOptions.length === 0 && (
+                    <span className="mt-1.5 block text-xs text-red-600 dark:text-red-400">
+                      Danh mục nhóm chưa có chi tiết nào — hãy thêm ở đó trước.
+                    </span>
+                  )}
+                </div>
+              </CardSection>
+            )}
+          </div>
         </div>
-      </div>
+      </fieldset>
 
       {state?.error && (
         <p
@@ -232,9 +243,13 @@ export function CategoryForm({
           href={cancelHref}
           className={`${BUTTON.secondary} w-full sm:w-auto`}
         >
-          Huỷ
+          {readOnly ? "Quay lại" : "Huỷ"}
         </Link>
-        <SubmitButton className="w-full sm:w-auto">{submitLabel}</SubmitButton>
+        {!readOnly && (
+          <SubmitButton className="w-full sm:w-auto">
+            {submitLabel}
+          </SubmitButton>
+        )}
       </div>
     </form>
   );

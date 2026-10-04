@@ -13,11 +13,17 @@ import mysql, {
   type RowDataPacket,
 } from 'mysql2/promise';
 
+import { MIGRATIONS, type Migration } from './migrations';
 import { SCHEMA } from './schema';
 
 export const DEFAULT_DATABASE_NAME = 'business-platform';
 
-export type SqlParam = string | number | boolean | null | Date | Buffer;
+const MIGRATION_LOCK = 'business-platform:migrate';
+const MIGRATION_LOCK_TIMEOUT_S = 60;
+
+/** Mảng lồng nhau dùng cho `IN (?)` hoặc INSERT nhiều dòng `VALUES ?`. */
+export type SqlParam =
+  string | number | boolean | null | Date | Buffer | SqlParam[];
 
 export type RunResult = {
   /** Số dòng bị ảnh hưởng (UPDATE tính cả dòng khớp nhưng không đổi giá trị). */
@@ -150,10 +156,69 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Tạo bảng/index còn thiếu. Mọi câu lệnh đều idempotent. */
-  private async migrate(): Promise<void> {
+  /**
+   * Tạo bảng/index còn thiếu rồi chạy các migration dữ liệu chưa chạy.
+   *
+   * Gọi tự động mỗi lần khởi động, nên deploy bản mới là database được nâng
+   * cấp luôn; `npm run migrate` gọi cùng hàm này khi muốn chạy riêng.
+   */
+  async migrate(): Promise<void> {
     for (const statement of SCHEMA) {
       await this.run(statement);
+    }
+
+    // Chỉ test bỏ qua: mỗi bộ test cần database trống để tự dựng dữ liệu.
+    if (this.config.get<string>('DB_SKIP_MIGRATIONS') === 'true') return;
+    await this.runMigrations(MIGRATIONS);
+  }
+
+  /**
+   * Chạy lần lượt các migration chưa có trong bảng `migrations`, mỗi cái một
+   * transaction. Khoá GET_LOCK giữ cho hai instance khởi động cùng lúc không
+   * chạy trùng một migration.
+   */
+  async runMigrations(migrations: readonly Migration[]): Promise<void> {
+    if (!this.pool) throw new Error('MySQL chưa được khởi tạo');
+
+    const connection = await this.pool.getConnection();
+    try {
+      const [lock] = await connection.query<RowDataPacket[]>(
+        `SELECT GET_LOCK(?, ?) AS acquired`,
+        [MIGRATION_LOCK, MIGRATION_LOCK_TIMEOUT_S],
+      );
+      if (Number(lock[0]?.acquired) !== 1) {
+        throw new Error(
+          'Không lấy được khoá migration (instance khác đang chạy?)',
+        );
+      }
+
+      try {
+        const applied = new Set(
+          (await this.all<{ name: string }>('SELECT name FROM migrations')).map(
+            (row) => row.name,
+          ),
+        );
+
+        for (const migration of migrations) {
+          if (applied.has(migration.name)) continue;
+
+          const started = Date.now();
+          await this.transaction(async () => {
+            await migration.up(this);
+            await this.run(
+              'INSERT INTO migrations (name, appliedAt) VALUES (?, ?)',
+              [migration.name, new Date().toISOString()],
+            );
+          });
+          this.logger.log(
+            `Migration: ${migration.name} (${Date.now() - started}ms)`,
+          );
+        }
+      } finally {
+        await connection.query('SELECT RELEASE_LOCK(?)', [MIGRATION_LOCK]);
+      }
+    } finally {
+      connection.release();
     }
   }
 }

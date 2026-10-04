@@ -56,7 +56,6 @@ import "ckeditor5/ckeditor5.css";
  */
 const LICENSE_KEY = process.env.NEXT_PUBLIC_CKEDITOR_LICENSE_KEY || "GPL";
 
-
 /**
  * Chỉ bật những tính năng mà bộ lọc HTML ở backend giữ lại được
  * (backend/src/articles/article-content.ts). Thêm plugin mới thì phải nới
@@ -148,9 +147,24 @@ const CONFIG: EditorConfig = {
   heading: {
     options: [
       { model: "paragraph", title: "Đoạn văn", class: "ck-heading_paragraph" },
-      { model: "heading2", view: "h2", title: "Tiêu đề 2", class: "ck-heading_heading2" },
-      { model: "heading3", view: "h3", title: "Tiêu đề 3", class: "ck-heading_heading3" },
-      { model: "heading4", view: "h4", title: "Tiêu đề 4", class: "ck-heading_heading4" },
+      {
+        model: "heading2",
+        view: "h2",
+        title: "Tiêu đề 2",
+        class: "ck-heading_heading2",
+      },
+      {
+        model: "heading3",
+        view: "h3",
+        title: "Tiêu đề 3",
+        class: "ck-heading_heading3",
+      },
+      {
+        model: "heading4",
+        view: "h4",
+        title: "Tiêu đề 4",
+        class: "ck-heading_heading4",
+      },
     ],
   },
   link: {
@@ -175,7 +189,12 @@ const CONFIG: EditorConfig = {
     insert: { integrations: ["upload", "url"] },
   },
   table: {
-    contentToolbar: ["tableColumn", "tableRow", "mergeTableCells", "toggleTableCaption"],
+    contentToolbar: [
+      "tableColumn",
+      "tableRow",
+      "mergeTableCells",
+      "toggleTableCaption",
+    ],
   },
 };
 
@@ -189,11 +208,14 @@ export default function RichTextEditor({
   name,
   defaultValue = "",
   uploadUrl,
+  disabled = false,
 }: {
   name: string;
   defaultValue?: string;
   /** Route nhận ảnh dán/kéo vào nội dung, vd. /admin/articles/images. */
   uploadUrl: string;
+  /** Chỉ đọc — `<fieldset disabled>` không khoá được vùng soạn của CKEditor. */
+  disabled?: boolean;
 }) {
   const [value, setValue] = useState(defaultValue);
   const [words, setWords] = useState(0);
@@ -215,6 +237,7 @@ export default function RichTextEditor({
       <CKEditor
         editor={ClassicEditor}
         config={config}
+        disabled={disabled}
         onChange={(_event, editor) => setValue(editor.getData())}
       />
       <input type="hidden" name={name} value={value} />

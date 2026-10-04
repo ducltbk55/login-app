@@ -47,6 +47,8 @@ export function testDatabaseConfig(
     ...serverConfig(),
     DB_NAME: `bp_test_${suffix}`,
     DB_DROP_ON_CLOSE: 'true',
+    // Database test bắt đầu trống; spec nào cần dữ liệu migration thì tự bật.
+    DB_SKIP_MIGRATIONS: 'true',
     UPLOAD_DIR: mkdtempSync(path.join(tmpdir(), 'bp-uploads-')),
     ...overrides,
   };

@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { ExternalIcon } from "@/components/admin/icons";
 import { BackLink, PageHeader } from "@/components/admin/page-header";
 import { ProductForm } from "@/components/admin/product-form";
+import { can } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 import {
   findProduct,
@@ -17,13 +19,16 @@ export default async function EditProductPage(
   props: PageProps<"/admin/products/[id]">,
 ) {
   const { id } = await props.params;
-  const [product, categories, specSuggestions] = await Promise.all([
+  const [product, categories, specSuggestions, user] = await Promise.all([
     findProduct(id),
     listProductCategories(),
     listSpecLabels(),
+    currentUser(),
   ]);
 
   if (!product) notFound();
+  // Layout đã đòi PRODUCTS.READ; thiếu WRITE thì vẫn xem được nhưng chỉ đọc.
+  const canWrite = can(user!, "PRODUCTS.WRITE");
 
   // Lĩnh vực của sản phẩm có thể đã bị tắt sau khi tạo. Không ghép vào danh
   // sách thì ô chọn hiện trống và admin vô tình đổi lĩnh vực khi bấm lưu.
@@ -44,7 +49,7 @@ export default async function EditProductPage(
       <BackLink href="/admin/products">Danh sách sản phẩm</BackLink>
 
       <PageHeader
-        title={`Sửa: ${product.name}`}
+        title={canWrite ? `Sửa: ${product.name}` : product.name}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-2">
             <span>Tạo lúc {formatDateTime(product.createdAt)}</span>
@@ -73,6 +78,8 @@ export default async function EditProductPage(
         action={updateProductAction.bind(null, product.id)}
         cancelHref="/admin/products"
         submitLabel="Lưu thay đổi"
+        readOnly={!canWrite}
+        canPublish={can(user!, "PRODUCTS.PUBLISH")}
       />
     </div>
   );

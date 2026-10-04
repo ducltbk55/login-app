@@ -14,6 +14,8 @@ chưa có) và các bảng còn thiếu theo `src/database/schema.ts`.
 | `src/main.ts` | Bootstrap: prefix `/api`, `ValidationPipe`, CORS, shutdown hooks |
 | `src/database/database.service.ts` | Pool MySQL, tạo database/bảng khi khởi động, helper `all/get/run/transaction()` |
 | `src/database/schema.ts` | Lược đồ MySQL (`CREATE TABLE IF NOT EXISTS`) |
+| `src/database/migrations/` | Migration dữ liệu chạy một lần mỗi database (danh mục, tỉnh/thành, phường/xã…) |
+| `scripts/migrate.ts` | Tạo bảng + chạy migration rồi thoát (`npm run migrate`) |
 | `scripts/import-sqlite.ts` | Chép dữ liệu từ file SQLite cũ sang MySQL (`npm run db:import-sqlite`) |
 | `src/users/users.service.ts` | Logic đăng ký / ghi nhận đăng nhập, truy vấn người dùng |
 | `src/users/users.controller.ts` | REST endpoints `/api/users*` |
@@ -318,6 +320,29 @@ npm run test:e2e   # e2e: health, api key, sync, DEV_LOGIN, bài viết, liên h
 
 Test kết nối bằng `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD` (biến môi trường, hoặc
 `.env.local`/`.env.test`), tạo database `bp_test_*` riêng và tự xoá khi xong.
+
+## Migration khi deploy
+
+Mỗi lần khởi động, backend tạo bảng còn thiếu rồi chạy các migration dữ liệu
+chưa chạy trong `src/database/migrations/index.ts` (ghi lại ở bảng
+`migrations`, mỗi migration một transaction, có `GET_LOCK` chống hai instance
+chạy trùng). Muốn chạy riêng ở bước deploy, trước khi bật server:
+
+```bash
+npm run migrate          # khi dev (ts-node)
+npm run migrate:prod     # sau npm run build: node dist/scripts/migrate.js
+```
+
+Migration hiện có:
+
+| Tên | Nội dung |
+| --- | --- |
+| `2026-10-04-001-categories-from-sqlite` | 6 danh mục xuất từ bản SQLite: quyền (17), chức năng (7), tỉnh/thành phố (34), phường/xã (3321, nhóm theo tỉnh), chuyên mục (4), lĩnh vực sản phẩm (3) |
+
+Migration chỉ **chèn phần còn thiếu** theo `code`, không ghi đè bản ghi admin
+đã sửa. Cần thay đổi dữ liệu thì thêm migration mới vào cuối mảng, đừng sửa
+migration đã deploy. Test mặc định tắt migration (`DB_SKIP_MIGRATIONS=true`)
+để mỗi bộ test bắt đầu từ database trống; xem `src/database/migrations.spec.ts`.
 
 ## Chuyển dữ liệu từ SQLite cũ
 
