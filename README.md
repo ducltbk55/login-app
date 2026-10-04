@@ -35,6 +35,15 @@ npm run dev:frontend   # http://localhost:3000
 
 Các script khác ở thư mục gốc: `npm run build`, `npm run lint`, `npm test`.
 
+## Deploy (Docker + nginx)
+
+```bash
+make init production && make deploy production   # máy chủ qua SSH, tự cấu hình domain + SSL
+make init local && make deploy local             # vào WSL, http://localhost:8080
+```
+
+Chi tiết cấu hình và quy trình: `deploy/README.md`.
+
 ## Biến môi trường
 
 `.env.local` của cả hai bên đã được tạo sẵn với `AUTH_SECRET` và `BACKEND_API_KEY` ngẫu nhiên

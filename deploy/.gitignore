@@ -1,0 +1,4 @@
+# Cấu hình thật chứa mật khẩu/secret — chỉ commit file *.example
+env/*.env
+!env/*.env.example
+backups/
