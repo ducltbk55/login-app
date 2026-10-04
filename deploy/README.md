@@ -52,12 +52,26 @@ bằng `make init`. File thật chứa mật khẩu nên **không được commi
 
 | Nhóm | Biến |
 | --- | --- |
-| Máy chủ | `SERVER_HOST`, `SERVER_USER`, `SERVER_PORT`, `SSH_KEY`, `DEPLOY_PATH`, `INSTALL_DOCKER` |
+| Máy chủ | `SERVER_HOST`, `SERVER_USER`, `SERVER_PORT`, `SSH_KEY`, `DEPLOY_PATH`, `INSTALL_DOCKER`, `DEPLOY_IN_PLACE` (local) |
 | Domain | `DOMAIN`, `SSL_ENABLED`, `LETSENCRYPT_EMAIL`, `HTTP_PORT`, `HTTPS_PORT` |
 | Database | `DB_IMAGE`, `DB_NAME` (mặc định `business-platform`), `DB_USER`, `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `DB_PUBLISH_PORT` |
 | Ứng dụng | `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `BACKEND_API_KEY`, `NEXT_PUBLIC_CKEDITOR_LICENSE_KEY`, `TZ` |
 
 `APP_URL` (dùng cho đăng nhập Google và CORS) được suy ra từ `DOMAIN` + SSL + cổng.
+
+### Deploy local không chép code (`DEPLOY_IN_PLACE`)
+
+Mặc định `make deploy local` chép code sang `DEPLOY_PATH/app` rồi build ở đó. Nếu
+đã clone dự án vào WSL, đặt `DEPLOY_IN_PLACE=true` trong `deploy/env/local.env` để
+build & chạy thẳng từ thư mục mã nguồn:
+
+- `DEPLOY_PATH` bị bỏ qua; `.env` của hệ thống ghi ở `deploy/.runtime/local.env` (đã ignore).
+- Không còn bản `app.prev`; code đang sửa dở cũng được build vào lần deploy sau.
+- Dữ liệu (volume) vẫn giữ nguyên khi chuyển qua lại giữa hai chế độ, vì cùng
+  `COMPOSE_PROJECT_NAME`. Thư mục `DEPLOY_PATH` cũ có thể xoá.
+- Chỉ áp dụng cho `local`; production luôn chép qua SSH.
+- Đừng clone code vào đúng `DEPLOY_PATH/app` khi dùng chế độ chép: deploy sẽ đổi
+  nó thành `app.prev` và lần sau xoá mất.
 
 ## Deploy production làm gì
 

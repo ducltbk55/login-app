@@ -109,7 +109,16 @@ if [[ "$INSTALLED" == "true" ]]; then
   DEPLOY_PATH="$(dirname "$ROOT")"
 fi
 
-require DEPLOY_PATH DOMAIN DB_NAME DB_USER DB_PASSWORD DB_ROOT_PASSWORD \
+# DEPLOY_IN_PLACE=true (chỉ local): build & chạy thẳng từ thư mục mã nguồn này,
+# không chép sang DEPLOY_PATH.
+IN_PLACE=false
+if [[ "${DEPLOY_IN_PLACE:-false}" == "true" && "$INSTALLED" != "true" ]]; then
+  [[ "$TARGET" == "local" ]] || die "DEPLOY_IN_PLACE chỉ dùng cho môi trường local."
+  IN_PLACE=true
+fi
+
+[[ "$IN_PLACE" == "true" ]] || require DEPLOY_PATH
+require DOMAIN DB_NAME DB_USER DB_PASSWORD DB_ROOT_PASSWORD \
   AUTH_SECRET BACKEND_API_KEY
 if [[ "$TARGET" == "production" && "$INSTALLED" != "true" ]]; then
   require SERVER_HOST SERVER_USER
@@ -146,13 +155,19 @@ remote() {
   fi
 }
 
-# Thư mục cài đặt trên máy đích; `~` được mở rộng ở phía máy đích.
-REMOTE_DIR_EXPR="d=$(printf '%q' "$DEPLOY_PATH"); d=\"\${d/#\\~/\$HOME}\""
+# Đặt biến trên máy đích: $app = thư mục code, $env = file .env của hệ thống.
+# Bình thường: <DEPLOY_PATH>/app và <DEPLOY_PATH>/.env (`~` mở rộng phía máy đích).
+# DEPLOY_IN_PLACE: chính thư mục mã nguồn, .env sinh ra ở deploy/.runtime/.
+if [[ "$IN_PLACE" == "true" ]]; then
+  REMOTE_DIR_EXPR="app=$(printf '%q' "$ROOT"); env=\"\$app/deploy/.runtime/$TARGET.env\""
+else
+  REMOTE_DIR_EXPR="d=$(printf '%q' "$DEPLOY_PATH"); d=\"\${d/#\\~/\$HOME}\"; app=\"\$d/app\"; env=\"\$d/.env\""
+fi
 
 compose_cmd() {
-  local files="-f app/deploy/docker-compose.yml"
-  [[ -z "${DB_PUBLISH_PORT:-}" ]] || files+=" -f app/deploy/docker-compose.db-port.yml"
-  echo "docker compose --env-file .env $files"
+  local files='-f "$app/deploy/docker-compose.yml"'
+  [[ -z "${DB_PUBLISH_PORT:-}" ]] || files+=' -f "$app/deploy/docker-compose.db-port.yml"'
+  echo "docker compose --env-file \"\$env\" $files"
 }
 
 # File .env cho máy đích: chỉ những gì container cần, không mang thông tin SSH.
@@ -185,29 +200,33 @@ cmd_deploy() {
     fi
   fi
 
-  log "Chép code sang máy đích ($DEPLOY_PATH)"
-  # Bỏ mọi thứ build ra, dữ liệu dev và file bí mật; image được build trên máy đích.
-  tar -C "$ROOT" -czf - \
-    --exclude=.git --exclude=node_modules --exclude=.next --exclude=dist \
-    --exclude=coverage --exclude='*.tsbuildinfo' --exclude='.env*' \
-    --exclude=backend/data --exclude=deploy/env --exclude=deploy/backups \
-    --exclude=.claude \
-    . | remote "$REMOTE_DIR_EXPR; mkdir -p \"\$d\" && rm -rf \"\$d/app.new\" &&
-      mkdir \"\$d/app.new\" && tar -xzf - -C \"\$d/app.new\" &&
-      rm -rf \"\$d/app.prev\" && { [ ! -d \"\$d/app\" ] || mv \"\$d/app\" \"\$d/app.prev\"; } &&
-      mv \"\$d/app.new\" \"\$d/app\""
+  if [[ "$IN_PLACE" == "true" ]]; then
+    log "Build thẳng từ thư mục mã nguồn ($ROOT)"
+  else
+    log "Chép code sang máy đích ($DEPLOY_PATH)"
+    # Bỏ mọi thứ build ra, dữ liệu dev và file bí mật; image được build trên máy đích.
+    tar -C "$ROOT" -czf - \
+      --exclude=.git --exclude=node_modules --exclude=.next --exclude=dist \
+      --exclude=coverage --exclude='*.tsbuildinfo' --exclude='.env*' \
+      --exclude=backend/data --exclude=deploy/env --exclude=deploy/backups \
+      --exclude=deploy/.runtime --exclude=.claude \
+      . | remote "$REMOTE_DIR_EXPR; mkdir -p \"\$d\" && rm -rf \"\$d/app.new\" &&
+        mkdir \"\$d/app.new\" && tar -xzf - -C \"\$d/app.new\" &&
+        rm -rf \"\$d/app.prev\" && { [ ! -d \"\$d/app\" ] || mv \"\$d/app\" \"\$d/app.prev\"; } &&
+        mv \"\$d/app.new\" \"\$d/app\""
+  fi
 
   log "Ghi cấu hình .env"
-  runtime_env | remote "$REMOTE_DIR_EXPR; umask 077; cat > \"\$d/.env\""
+  runtime_env | remote "$REMOTE_DIR_EXPR; umask 077; mkdir -p \"\$(dirname \"\$env\")\" && cat > \"\$env\""
 
   log "Build & khởi động"
-  remote "$REMOTE_DIR_EXPR; bash \"\$d/app/deploy/scripts/up.sh\" \"\$d/.env\""
+  remote "$REMOTE_DIR_EXPR; bash \"\$app/deploy/scripts/up.sh\" \"\$env\""
 }
 
 # ---------------------------------------------------------------- các lệnh khác
-cmd_status() { remote "$REMOTE_DIR_EXPR; cd \"\$d\" && $(compose_cmd) ps"; }
-cmd_logs() { remote "$REMOTE_DIR_EXPR; cd \"\$d\" && $(compose_cmd) logs -f --tail=200"; }
-cmd_down() { remote "$REMOTE_DIR_EXPR; cd \"\$d\" && $(compose_cmd) --profile ssl down"; }
+cmd_status() { remote "$REMOTE_DIR_EXPR; $(compose_cmd) ps"; }
+cmd_logs() { remote "$REMOTE_DIR_EXPR; $(compose_cmd) logs -f --tail=200"; }
+cmd_down() { remote "$REMOTE_DIR_EXPR; $(compose_cmd) --profile ssl down"; }
 
 cmd_backup() {
   local dir="$BACKUP_DIR"
@@ -215,7 +234,7 @@ cmd_backup() {
   file="$dir/$TARGET-$(date +%Y%m%d-%H%M%S).sql.gz"
   mkdir -p "$dir"
   log "Dump database $DB_NAME -> $file"
-  remote "$REMOTE_DIR_EXPR; cd \"\$d\" && $(compose_cmd) exec -T db sh -c '
+  remote "$REMOTE_DIR_EXPR; $(compose_cmd) exec -T db sh -c '
       dump=\$(command -v mariadb-dump || command -v mysqldump)
       \"\$dump\" -uroot -p\"\$MYSQL_ROOT_PASSWORD\" --single-transaction --routines \"\$MYSQL_DATABASE\"' | gzip" >"$file"
   log "Xong: $file"
