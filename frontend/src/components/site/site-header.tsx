@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { CloseIcon, MenuIcon } from "@/components/admin/icons";
+import { CartLink } from "@/components/site/cart-link";
 import {
   COMPANY_LOGO,
   COMPANY_NAME,
@@ -74,6 +75,7 @@ export function SiteHeader({ accountSlot }: { accountSlot: ReactNode }) {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-4">
+          <CartLink />
           {accountSlot}
 
           <button

@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation";
 import type { ComponentType, SVGProps } from "react";
 
 import {
+  BoxIcon,
   DashboardIcon,
   MailIcon,
   NewspaperIcon,
+  ReceiptIcon,
   ShieldIcon,
   TagIcon,
   UsersIcon,
@@ -24,6 +26,8 @@ const ITEMS: NavItem[] = [
   { href: "/admin", label: "Tổng quan", icon: DashboardIcon, exact: true },
   { href: "/admin/users", label: "Người dùng", icon: UsersIcon },
   { href: "/admin/articles", label: "Bài viết", icon: NewspaperIcon },
+  { href: "/admin/products", label: "Sản phẩm", icon: BoxIcon },
+  { href: "/admin/orders", label: "Đơn hàng", icon: ReceiptIcon },
   { href: "/admin/categories", label: "Danh mục", icon: TagIcon },
   { href: "/admin/contacts", label: "Liên hệ", icon: MailIcon },
   { href: "/admin/permission-groups", label: "Nhóm quyền", icon: ShieldIcon },

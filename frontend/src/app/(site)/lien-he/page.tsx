@@ -34,7 +34,17 @@ function InfoCard({
   );
 }
 
-export default function ContactPage() {
+function pickOne(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function ContactPage(props: PageProps<"/lien-he">) {
+  // Giỏ hàng và nút "Liên hệ báo giá" chuyển sang đây kèm chủ đề / nội dung
+  // điền sẵn. Cắt theo đúng giới hạn của form để không bị từ chối khi gửi.
+  const params = await props.searchParams;
+  const initialSubject = pickOne(params["chu-de"])?.slice(0, 160);
+  const initialMessage = pickOne(params["noi-dung"])?.slice(0, 5000);
+
   return (
     <>
       <section className="bg-ink-900 text-white">
@@ -117,7 +127,10 @@ export default function ContactPage() {
                 Điền thông tin bên dưới, chúng tôi sẽ liên hệ lại sớm nhất.
               </p>
               <div className="mt-8">
-                <ContactForm />
+                <ContactForm
+                  initialSubject={initialSubject}
+                  initialMessage={initialMessage}
+                />
               </div>
             </div>
           </div>

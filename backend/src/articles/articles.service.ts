@@ -9,6 +9,11 @@ import { matchesSearch } from '../common/search';
 import { slugify } from '../common/slugify';
 import { SqliteService } from '../database/sqlite.service';
 import {
+  isBlankArticleHtml,
+  normalizeArticleContent,
+  textOfHtml,
+} from './article-content';
+import {
   readingMinutesOf,
   type Article,
   type ArticleStatus,
@@ -42,6 +47,7 @@ export class ArticlesService {
   private toArticle(row: ArticleRow, now: string): Article {
     const publishedAt = row.publishedAt;
     const status = row.status as ArticleStatus;
+    const content = normalizeArticleContent(row.content);
 
     return {
       id: Number(row.id),
@@ -57,7 +63,7 @@ export class ArticlesService {
       slug: row.slug,
       title: row.title,
       summary: row.summary,
-      content: row.content,
+      content,
       coverImage: row.coverImage,
       author: row.author,
       publishedAt,
@@ -66,10 +72,22 @@ export class ArticlesService {
       viewCount: Number(row.viewCount),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      readingMinutes: readingMinutesOf(row.content),
+      readingMinutes: readingMinutesOf(textOfHtml(content)),
       live:
         status === 'published' && publishedAt !== null && publishedAt <= now,
     };
+  }
+
+  /**
+   * HTML từ editor → HTML đã lọc, sẵn sàng lưu. Kiểm tra rỗng SAU khi lọc:
+   * `<p>&nbsp;</p>` hay một thẻ bị lọc sạch thì vẫn là không có nội dung.
+   */
+  private cleanContent(content: string): string {
+    const html = normalizeArticleContent(content);
+    if (isBlankArticleHtml(html)) {
+      throw new BadRequestException('Nội dung không được để trống');
+    }
+    return html;
   }
 
   /** Luôn kèm chuyên mục; sắp bài mới nhất lên trước. */
@@ -177,7 +195,7 @@ export class ArticlesService {
           slug,
           dto.title,
           dto.summary ?? null,
-          dto.content,
+          this.cleanContent(dto.content),
           dto.coverImage ?? null,
           dto.author,
           this.resolvePublishedAt(dto.publishedAt ?? null, status, now),
@@ -228,7 +246,9 @@ export class ArticlesService {
           slug,
           dto.title ?? current.title,
           dto.summary !== undefined ? dto.summary : current.summary,
-          dto.content ?? current.content,
+          dto.content === undefined
+            ? current.content
+            : this.cleanContent(dto.content),
           dto.coverImage !== undefined ? dto.coverImage : current.coverImage,
           dto.author ?? current.author,
           publishedAt,

@@ -252,3 +252,71 @@ export function PaperclipIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function BoxIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z" />
+      <path d="m4 7.5 8 4.5 8-4.5M12 12v9" />
+    </Icon>
+  );
+}
+
+export function CartIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 4h2l2.2 10.2a1.5 1.5 0 0 0 1.5 1.3h8.6a1.5 1.5 0 0 0 1.5-1.2L20 8H6" />
+      <circle cx="9.5" cy="19.5" r="1.25" />
+      <circle cx="17" cy="19.5" r="1.25" />
+    </Icon>
+  );
+}
+
+export function ReceiptIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
+      <path d="M9 8h6M9 12h6M9 16h3" />
+    </Icon>
+  );
+}
+
+export function PlayCircleIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 8.75v6.5a.6.6 0 0 0 .9.52l5.4-3.25a.6.6 0 0 0 0-1.04l-5.4-3.25a.6.6 0 0 0-.9.52Z" />
+    </Icon>
+  );
+}
+
+export function ImagesIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5" width="15" height="13" rx="2" />
+      <circle cx="8" cy="9.5" r="1.5" />
+      <path d="m3 15.5 4-3.5 3.5 3 3-2.5 4.5 4" />
+      <path d="M21 8v10a3 3 0 0 1-3 3H7" />
+    </Icon>
+  );
+}
+
+export function DocumentTextIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+      <path d="M14 3v5h5M9 13h6M9 17h4" />
+    </Icon>
+  );
+}
+
+export function SlidersIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 6h10M18 6h2M4 12h3M11 12h9M4 18h12M20 18h0" />
+      <circle cx="16" cy="6" r="2" />
+      <circle cx="9" cy="12" r="2" />
+      <circle cx="18" cy="18" r="2" />
+    </Icon>
+  );
+}

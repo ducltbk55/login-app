@@ -230,6 +230,115 @@ export class SqliteService implements OnModuleInit, OnModuleDestroy {
         ON articles(status, publishedAt DESC);
     `);
 
+    // Sản phẩm. Lĩnh vực là một chi tiết của danh mục DM_LINH_VUC_SP, cùng
+    // cách tham chiếu và cùng lý do không CASCADE như bài viết ở trên.
+    // Giá lưu số nguyên VNĐ (không có xu lẻ), NULL = chưa công bố giá.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        categoryDetailId INTEGER NOT NULL REFERENCES category_details(id),
+        slug TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        sku TEXT,
+        summary TEXT,
+        description TEXT,
+        image TEXT,
+        price INTEGER,
+        salePrice INTEGER,
+        launchedAt TEXT,
+        status TEXT NOT NULL DEFAULT 'draft',
+        inStock INTEGER NOT NULL DEFAULT 1,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        CHECK (price IS NULL OR price >= 0),
+        CHECK (salePrice IS NULL OR (price IS NOT NULL AND salePrice < price))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_products_categoryDetailId
+        ON products(categoryDetailId);
+      CREATE INDEX IF NOT EXISTS idx_products_status
+        ON products(status);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_products_sku
+        ON products(sku COLLATE NOCASE) WHERE sku IS NOT NULL;
+    `);
+    // Bộ sưu tập ảnh cho slideshow ở trang chi tiết: mảng JSON các URL, đúng
+    // thứ tự admin sắp. Không tách bảng riêng vì ảnh luôn được đọc/ghi cả bộ
+    // cùng sản phẩm, không bao giờ truy vấn lẻ từng ảnh.
+    this.addColumnIfMissing(
+      'products',
+      'gallery',
+      "TEXT NOT NULL DEFAULT '[]'",
+    );
+    // Thông số kỹ thuật riêng từng sản phẩm: mảng JSON [{label, value}], vd.
+    // [{"label":"Camera","value":"200MP"}]. Mỗi sản phẩm một bộ trường khác
+    // nhau nên không tách cột; không truy vấn/lọc theo từng thông số.
+    this.addColumnIfMissing('products', 'specs', "TEXT NOT NULL DEFAULT '[]'");
+    // Link video giới thiệu (YouTube/Vimeo/file), NULL = không có video.
+    this.addColumnIfMissing('products', 'videoUrl', 'TEXT');
+
+    // Đơn hàng. Dòng hàng lưu BẢN CHỤP tên/giá lúc đặt; `productId` chỉ để
+    // dẫn về sản phẩm, xoá sản phẩm thì về NULL chứ không làm mất đơn.
+    // Lịch sử (order_events) chỉ thêm, không sửa — đó là nhật ký đối chiếu.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT NOT NULL UNIQUE,
+        customerName TEXT NOT NULL,
+        customerPhone TEXT NOT NULL,
+        customerEmail TEXT,
+        address TEXT,
+        note TEXT,
+        userEmail TEXT,
+        paymentMethod TEXT NOT NULL,
+        paymentStatus TEXT NOT NULL DEFAULT 'unpaid',
+        status TEXT NOT NULL DEFAULT 'pending',
+        subtotal INTEGER NOT NULL,
+        discount INTEGER NOT NULL DEFAULT 0,
+        total INTEGER NOT NULL,
+        adminNote TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        CHECK (total >= 0 AND discount >= 0 AND total = subtotal - discount)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_orders_status_createdAt
+        ON orders(status, createdAt DESC);
+      CREATE INDEX IF NOT EXISTS idx_orders_userEmail
+        ON orders(userEmail COLLATE NOCASE);
+
+      CREATE TABLE IF NOT EXISTS order_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        orderId INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        productId INTEGER REFERENCES products(id) ON DELETE SET NULL,
+        productName TEXT NOT NULL,
+        productSlug TEXT,
+        sku TEXT,
+        image TEXT,
+        listPrice INTEGER NOT NULL,
+        unitPrice INTEGER NOT NULL,
+        quantity INTEGER NOT NULL CHECK (quantity > 0)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_order_items_orderId
+        ON order_items(orderId);
+      CREATE INDEX IF NOT EXISTS idx_order_items_productId
+        ON order_items(productId);
+
+      CREATE TABLE IF NOT EXISTS order_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        orderId INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        fromValue TEXT,
+        toValue TEXT,
+        note TEXT,
+        actor TEXT,
+        createdAt TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_order_events_orderId
+        ON order_events(orderId);
+    `);
+
     // Yêu cầu liên hệ từ trang ngoài. Tệp đính kèm nằm trên đĩa
     // (`data/uploads/contacts`), DB chỉ giữ thông tin mô tả:
     //   attachmentFile = tên do hệ thống sinh, dùng để đọc file

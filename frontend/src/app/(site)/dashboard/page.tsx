@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { Avatar } from "@/components/avatar";
+import { MyOrders } from "@/components/site/my-orders";
 import { COMPANY_NAME } from "@/lib/company";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { listOrders } from "@/lib/orders";
 import {
   findUserByEmail,
   getLoginHistory,
@@ -68,9 +70,13 @@ export default async function ProfilePage(props: PageProps<"/dashboard">) {
 
   const { denied } = await props.searchParams;
   const email = session.user.email;
-  const [record, history] = await Promise.all([
+  const [record, history, orders] = await Promise.all([
     findUserByEmail(email),
     getLoginHistory(email, 5),
+    // Lỗi đọc đơn hàng không được làm hỏng cả trang cá nhân.
+    listOrders({ userEmail: email, pageSize: 20 })
+      .then((result) => result.items)
+      .catch(() => null),
   ]);
 
   // Cổng chặn: chưa khai đủ hồ sơ thì phải hoàn tất trước khi vào trang cá nhân.
@@ -195,6 +201,28 @@ export default async function ProfilePage(props: PageProps<"/dashboard">) {
             <Field label="Địa chỉ" value={fullAddress || "—"} />
           </dl>
         </Panel>
+
+        <div id="don-hang" className="scroll-mt-24">
+          <Panel
+            title="Đơn hàng của tôi"
+            action={
+              <Link
+                href="/san-pham"
+                className="text-sm font-semibold text-gold-700 underline underline-offset-4 transition hover:text-gold-600"
+              >
+                Mua thêm
+              </Link>
+            }
+          >
+            {orders ? (
+              <MyOrders orders={orders} />
+            ) : (
+              <p className="text-sm text-black/55">
+                Chưa tải được danh sách đơn hàng. Vui lòng thử lại sau.
+              </p>
+            )}
+          </Panel>
+        </div>
 
         <Panel title="Thông tin tài khoản">
           <dl className="grid gap-6 sm:grid-cols-2">

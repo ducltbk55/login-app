@@ -15,6 +15,15 @@ import {
 import { ARTICLE_STATUSES } from '../article.entity';
 import type { ArticleStatus } from '../article.entity';
 
+/**
+ * Ảnh bìa: link http(s) bên ngoài, hoặc ảnh đã tải lên qua /articles/images
+ * (phát ở /media/articles/<uuid>.<đuôi>). Chặn `javascript:`, `data:`, đường
+ * dẫn tương đối tuỳ ý — giá trị này đi thẳng vào thẻ img và thẻ meta chia sẻ.
+ */
+const COVER_IMAGE =
+  /^(https?:\/\/[^\s"'<>]+|\/media\/articles\/[0-9a-f-]{36}\.(jpg|png|gif|webp))$/;
+const COVER_IMAGE_MESSAGE = 'Ảnh bìa phải là link http(s) hoặc ảnh đã tải lên';
+
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
@@ -68,6 +77,7 @@ export class CreateArticleDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
+  @Matches(COVER_IMAGE, { message: COVER_IMAGE_MESSAGE })
   @Transform(emptyToNull)
   coverImage?: string | null;
 
@@ -133,6 +143,7 @@ export class UpdateArticleDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
+  @Matches(COVER_IMAGE, { message: COVER_IMAGE_MESSAGE })
   @Transform(emptyToNull)
   coverImage?: string | null;
 

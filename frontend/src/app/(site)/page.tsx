@@ -113,6 +113,28 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* Mời tham gia thành viên */}
+      <section className="border-b border-gold-200/70 bg-gold-50/60">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-14 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+          <div className="max-w-2xl">
+            <h2 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+              Trở thành thành viên của {COMPANY_SHORT_NAME}
+            </h2>
+            <p className="mt-2 text-black/60">
+              Đăng nhập bằng Google, bổ sung vài thông tin liên hệ là xong. Sau
+              đó bạn theo dõi được yêu cầu và hồ sơ của mình ở một nơi.
+            </p>
+          </div>
+          <Link
+            href="/register"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-ink-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-ink-800"
+          >
+            Trở thành thành viên
+            <ChevronRightIcon className="size-4" />
+          </Link>
+        </div>
+      </section>
+
       {/* Dịch vụ */}
       <section className="mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="max-w-2xl">
@@ -179,28 +201,6 @@ export default async function HomePage() {
               Chưa có bài viết nào được đăng.
             </p>
           )}
-        </div>
-      </section>
-
-      {/* Mời tham gia thành viên */}
-      <section className="border-y border-gold-200/70 bg-gold-50/60">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-14 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <div className="max-w-2xl">
-            <h2 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
-              Trở thành thành viên của {COMPANY_SHORT_NAME}
-            </h2>
-            <p className="mt-2 text-black/60">
-              Đăng nhập bằng Google, bổ sung vài thông tin liên hệ là xong. Sau
-              đó bạn theo dõi được yêu cầu và hồ sơ của mình ở một nơi.
-            </p>
-          </div>
-          <Link
-            href="/register"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-ink-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-ink-800"
-          >
-            Trở thành thành viên
-            <ChevronRightIcon className="size-4" />
-          </Link>
         </div>
       </section>
 

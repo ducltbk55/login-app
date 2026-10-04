@@ -7,7 +7,9 @@ import { ContactsModule } from './contacts/contacts.module';
 import { DatabaseModule } from './database/database.module';
 import { DevLoginModule } from './dev-login/dev-login.module';
 import { HealthModule } from './health/health.module';
+import { OrdersModule } from './orders/orders.module';
 import { PermissionGroupsModule } from './permission-groups/permission-groups.module';
+import { ProductsModule } from './products/products.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -21,6 +23,8 @@ import { UsersModule } from './users/users.module';
     PermissionGroupsModule,
     CategoriesModule,
     ArticlesModule,
+    ProductsModule,
+    OrdersModule,
     ContactsModule,
     HealthModule,
     DevLoginModule,

@@ -25,6 +25,7 @@ export type Article = {
   title: string;
   /** Sapo hiển thị ở danh sách và thẻ chia sẻ. */
   summary: string | null;
+  /** HTML từ CKEditor, đã qua bộ lọc allowlist (xem article-content.ts). */
   content: string;
   /** URL ảnh bìa. Để trống thì trang ngoài hiện khối màu thay thế. */
   coverImage: string | null;
@@ -53,7 +54,8 @@ export type Article = {
 /** Từ mỗi phút, lấy mức đọc tiếng Việt thường gặp. */
 const WORDS_PER_MINUTE = 200;
 
-export function readingMinutesOf(content: string): number {
-  const words = content.trim().split(/\s+/).filter(Boolean).length;
+/** Nhận chữ thuần — HTML phải bóc thẻ trước (xem `textOfHtml`). */
+export function readingMinutesOf(text: string): number {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
 }

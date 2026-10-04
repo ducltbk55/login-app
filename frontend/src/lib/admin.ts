@@ -14,10 +14,23 @@ export async function requireAdmin(): Promise<StoredUserDetail> {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
+  const user = await currentAdmin();
+  if (!user) redirect("/dashboard?denied=admin");
+
+  return user;
+}
+
+/**
+ * Như `requireAdmin` nhưng trả `null` thay vì chuyển hướng — cho route handler
+ * được gọi bằng fetch/XHR (upload ảnh từ editor), nơi một cú redirect sang
+ * trang HTML chỉ khiến phía gọi báo lỗi khó hiểu.
+ */
+export async function currentAdmin(): Promise<StoredUserDetail | null> {
+  const session = await auth();
+  if (!session?.user?.email) return null;
+
   const user = await findUserByEmail(session.user.email);
-  if (!user || user.role !== "admin" || user.status !== "active") {
-    redirect("/dashboard?denied=admin");
-  }
+  if (!user || user.role !== "admin" || user.status !== "active") return null;
 
   return user;
 }

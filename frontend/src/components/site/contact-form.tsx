@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import {
   submitContactAction,
-  EMPTY_CONTACT_STATE,
+  type ContactFormState,
 } from "@/app/(site)/lien-he/actions";
 import { COMPANY_PROFILE } from "@/lib/company";
 import {
@@ -113,11 +113,21 @@ function AttachmentField() {
   );
 }
 
+// Không đặt trong actions.ts: file "use server" chỉ được export hàm async.
+const EMPTY_CONTACT_STATE: ContactFormState = { status: "idle" };
+
 /**
  * Biểu mẫu liên hệ: gửi thẳng vào hệ thống qua server action, lưu lại cùng tệp
  * đính kèm để bộ phận phụ trách xử lý trong trang quản trị.
  */
-export function ContactForm() {
+export function ContactForm({
+  initialSubject,
+  initialMessage,
+}: {
+  /** Điền sẵn khi khách đến từ giỏ hàng / nút "Liên hệ báo giá". */
+  initialSubject?: string;
+  initialMessage?: string;
+} = {}) {
   const [state, formAction] = useActionState(
     submitContactAction,
     EMPTY_CONTACT_STATE,
@@ -203,7 +213,7 @@ export function ContactForm() {
             id="contact-subject"
             name="subject"
             maxLength={160}
-            defaultValue={state.values?.subject}
+            defaultValue={state.values?.subject ?? initialSubject}
             placeholder="Tư vấn giải pháp"
             className={FIELD}
           />
@@ -220,7 +230,7 @@ export function ContactForm() {
           required
           rows={6}
           maxLength={5000}
-          defaultValue={state.values?.message}
+          defaultValue={state.values?.message ?? initialMessage}
           placeholder="Mô tả ngắn gọn bài toán bạn đang gặp…"
           className={`${FIELD} resize-y`}
         />

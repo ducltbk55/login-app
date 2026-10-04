@@ -6,6 +6,8 @@ const TONES = {
   brand: "bg-brand-500/12 text-brand-700 ring-brand-500/25 dark:text-brand-300",
   success:
     "bg-emerald-500/12 text-emerald-700 ring-emerald-500/25 dark:text-emerald-400",
+  warning:
+    "bg-amber-500/15 text-amber-800 ring-amber-500/30 dark:text-amber-300",
   danger: "bg-red-500/12 text-red-700 ring-red-500/25 dark:text-red-400",
   info: "bg-brand-500/12 text-brand-700 ring-brand-500/25 dark:text-brand-300",
 } as const;

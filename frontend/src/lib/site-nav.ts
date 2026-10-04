@@ -14,6 +14,7 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Home", exact: true },
+  { href: "/san-pham", label: "Product" },
   { href: "/about", label: "About Us" },
   { href: "/tin-tuc", label: "Tin Tức" },
   { href: "/tuyen-dung", label: "Tuyển dụng" },

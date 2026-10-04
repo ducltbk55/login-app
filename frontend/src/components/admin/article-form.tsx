@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
+import { CardSection } from "@/components/admin/card-section";
+import { CoverImageField } from "@/components/admin/cover-image-field";
 import { AlertIcon } from "@/components/admin/icons";
+import { RichTextEditor } from "@/components/admin/lazy-rich-text-editor";
 import { SearchableSelect } from "@/components/admin/searchable-select";
 import { SubmitButton } from "@/components/submit-button";
 import {
@@ -12,31 +15,9 @@ import {
   type ArticleCategory,
   type ArticleStatus,
 } from "@/lib/articles";
-import { BUTTON, CARD, CHECKBOX, INPUT, LABEL_TEXT } from "@/lib/styles";
+import { BUTTON, CHECKBOX, INPUT, LABEL_TEXT } from "@/lib/styles";
 
 type FormState = { error?: string } | null;
-
-function CardSection({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className={CARD}>
-      <div className="border-b border-admin-border px-5 py-3.5">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        {description && (
-          <p className="mt-0.5 text-xs text-admin-muted">{description}</p>
-        )}
-      </div>
-      <div className="space-y-4 p-5">{children}</div>
-    </section>
-  );
-}
 
 /**
  * `datetime-local` cần đúng định dạng "YYYY-MM-DDTHH:mm" theo giờ địa phương.
@@ -115,23 +96,16 @@ export function ArticleForm({
               </span>
             </label>
 
-            <label className="block text-sm">
+            {/* Không bọc trong <label>: bấm vào thanh công cụ sẽ bị label
+                chuyển focus đi chỗ khác. */}
+            <div className="block text-sm">
               <span className={`mb-1.5 block ${LABEL_TEXT}`}>Nội dung *</span>
-              <textarea
+              <RichTextEditor
                 name="content"
-                required
-                rows={20}
                 defaultValue={record?.content}
-                placeholder={
-                  "Viết nội dung bài ở đây.\n\nMỗi đoạn cách nhau một dòng trống."
-                }
-                className={`${INPUT} resize-y leading-relaxed`}
+                uploadUrl="/admin/articles/images"
               />
-              <span className="mt-1.5 block text-xs text-admin-muted">
-                Cách nhau một dòng trống để tách đoạn. Thời gian đọc được tính
-                tự động từ độ dài.
-              </span>
-            </label>
+            </div>
           </CardSection>
         </div>
 
@@ -226,20 +200,10 @@ export function ArticleForm({
           </CardSection>
 
           <CardSection title="Hiển thị">
-            <label className="block text-sm">
-              <span className={`mb-1.5 block ${LABEL_TEXT}`}>Ảnh bìa</span>
-              <input
-                name="coverImage"
-                type="url"
-                maxLength={500}
-                defaultValue={record?.coverImage ?? ""}
-                placeholder="https://..."
-                className={INPUT}
-              />
-              <span className="mt-1.5 block text-xs text-admin-muted">
-                Bỏ trống thì trang ngoài hiện khối màu thay ảnh.
-              </span>
-            </label>
+            <CoverImageField
+              defaultValue={record?.coverImage}
+              uploadUrl="/admin/articles/images"
+            />
 
             <label className="block text-sm">
               <span className={`mb-1.5 block ${LABEL_TEXT}`}>

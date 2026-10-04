@@ -21,8 +21,6 @@ export type ContactFormState = {
   };
 };
 
-export const EMPTY_CONTACT_STATE: ContactFormState = { status: "idle" };
-
 function text(formData: FormData, field: string): string {
   return String(formData.get(field) ?? "").trim();
 }

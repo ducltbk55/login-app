@@ -31,6 +31,8 @@ export const FUNCTION_SEEDS: FunctionSeed[] = [
   { code: 'PERMISSION-GROUPS', label: 'Nhóm quyền' },
   { code: 'ARTICLES', label: 'Bài viết' },
   { code: 'CONTACTS', label: 'Liên hệ' },
+  { code: 'PRODUCTS', label: 'Sản phẩm' },
+  { code: 'ORDERS', label: 'Đơn hàng' },
 ];
 
 export type PermissionSeed = {
@@ -97,6 +99,36 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
     code: 'CONTACTS.WRITE',
     label: 'Đổi trạng thái / xoá liên hệ',
     functionCode: 'CONTACTS',
+  },
+  {
+    code: 'PRODUCTS.READ',
+    label: 'Xem sản phẩm',
+    functionCode: 'PRODUCTS',
+  },
+  {
+    code: 'PRODUCTS.WRITE',
+    label: 'Thêm / sửa / xoá sản phẩm',
+    functionCode: 'PRODUCTS',
+  },
+  {
+    code: 'PRODUCTS.PUBLISH',
+    label: 'Mở bán / ngừng bán sản phẩm',
+    functionCode: 'PRODUCTS',
+  },
+  {
+    code: 'ORDERS.READ',
+    label: 'Xem đơn hàng',
+    functionCode: 'ORDERS',
+  },
+  {
+    code: 'ORDERS.WRITE',
+    label: 'Xử lý đơn hàng (xác nhận, giao, huỷ, ghi chú)',
+    functionCode: 'ORDERS',
+  },
+  {
+    code: 'ORDERS.PAYMENT',
+    label: 'Cập nhật thanh toán đơn hàng',
+    functionCode: 'ORDERS',
   },
 ];
 

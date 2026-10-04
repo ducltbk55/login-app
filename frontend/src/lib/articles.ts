@@ -1,4 +1,4 @@
-import { request, requestOptional, segment } from "./backend";
+import { request, requestOptional, requestStream, segment } from "./backend";
 import type { Paginated, PageQuery } from "./categories";
 
 /** `draft` chưa từng đăng, `archived` đã đăng rồi gỡ xuống. */
@@ -148,4 +148,24 @@ export async function recordArticleView(slug: string): Promise<void> {
   } catch {
     // bỏ qua có chủ đích
   }
+}
+
+/** Đường dẫn công khai của ảnh trong bài — xem app/media/articles/[file]. */
+export function articleImageUrl(file: string): string {
+  return `/media/articles/${encodeURIComponent(file)}`;
+}
+
+/** Gửi ảnh lên backend, nhận về tên file đã lưu. */
+export async function uploadArticleImage(image: File): Promise<string> {
+  const body = new FormData();
+  body.set("upload", image, image.name);
+  const { file } = await request<{ file: string }>("/articles/images", {
+    method: "POST",
+    body,
+  });
+  return file;
+}
+
+export async function articleImage(file: string): Promise<Response> {
+  return requestStream(`/articles/images/${segment(file)}`);
 }

@@ -10,12 +10,24 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  StreamableFile,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 
 import { ApiKeyGuard } from '../common/api-key.guard';
+import {
+  IMAGE_UPLOAD_OPTIONS,
+  PUBLIC_IMAGE_HEADERS,
+  type UploadedImage,
+} from '../common/image-store';
 import { paginate, type Paginated } from '../common/pagination';
 import type { Article } from './article.entity';
+import { ArticleImagesService } from './article-images.service';
 import { ArticleCategoriesService } from './article-categories.service';
 import { ArticlesService } from './articles.service';
 import { ListArticlesDto } from './dto/list-articles.dto';
@@ -27,6 +39,7 @@ export class ArticlesController {
   constructor(
     private readonly articles: ArticlesService,
     private readonly categories: ArticleCategoriesService,
+    private readonly images: ArticleImagesService,
   ) {}
 
   @Get()
@@ -79,6 +92,27 @@ export class ArticlesController {
   @HttpCode(204)
   recordView(@Param('slug') slug: string): void {
     this.articles.recordView(slug);
+  }
+
+  /** Ảnh chèn trong nội dung bài, tải lên từ CKEditor. Trả về tên file. */
+  @Post('images')
+  @HttpCode(201)
+  @UseInterceptors(FileInterceptor('upload', IMAGE_UPLOAD_OPTIONS))
+  uploadImage(@UploadedFile() file?: UploadedImage): { file: string } {
+    return { file: this.images.save(file) };
+  }
+
+  /**
+   * Phát ảnh trong bài. Tên file là uuid, nội dung không bao giờ đổi, nên
+   * cho cache lâu dài. `nosniff` giữ trình duyệt đúng với kiểu đã kiểm tra.
+   */
+  @Get('images/:file')
+  image(
+    @Param('file') name: string,
+    @Res({ passthrough: true }) res: Response,
+  ): StreamableFile {
+    res.set(PUBLIC_IMAGE_HEADERS);
+    return this.images.stream(name, res);
   }
 
   @Get(':id')

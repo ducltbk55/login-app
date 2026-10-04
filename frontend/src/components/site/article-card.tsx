@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import type { Article } from "@/lib/articles";
-import { formatDate } from "@/lib/format";
+import { formatDate, textOfHtml } from "@/lib/format";
 
 /**
  * Bài chưa có sapo thì lấy tạm đoạn đầu nội dung — danh sách tin mà chỉ có
@@ -10,7 +10,7 @@ import { formatDate } from "@/lib/format";
 export function excerptOf(article: Article, limit = 180): string {
   if (article.summary) return article.summary;
 
-  const text = article.content.replace(/\s+/g, " ").trim();
+  const text = textOfHtml(article.content);
   return text.length > limit ? `${text.slice(0, limit).trimEnd()}…` : text;
 }
 
@@ -79,7 +79,12 @@ export function FeaturedArticleCard({ article }: { article: Article }) {
   return (
     <article className="group overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm transition hover:shadow-lg">
       <Link href={`/tin-tuc/${article.slug}`} className="grid lg:grid-cols-2">
-        <Cover article={article} className="h-56 w-full lg:h-full lg:min-h-72" />
+        {/* Ảnh nằm tuyệt đối trong khung cao cố định: để ảnh tự dàn thì cỡ
+            gốc của ảnh quyết định chiều cao cả thẻ (ảnh to → thẻ dài ngoằng).
+            Màn rộng thì khung cao theo cột chữ, tối thiểu 320px. */}
+        <div className="relative h-56 sm:h-72 lg:h-auto lg:min-h-80">
+          <Cover article={article} className="absolute inset-0 size-full" />
+        </div>
         <div className="flex flex-col justify-center p-7 sm:p-10">
           <ArticleMeta article={article} className="text-black/50" />
           <h2 className="mt-4 text-2xl font-semibold tracking-tight text-balance transition group-hover:text-gold-700 sm:text-3xl">

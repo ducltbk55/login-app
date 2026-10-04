@@ -10,6 +10,10 @@ import {
 import { COMPANY_NAME } from "@/lib/company";
 import { formatDate } from "@/lib/format";
 
+// Kiểu dáng chuẩn của CKEditor cho ảnh căn lề, bảng, chú thích… để bài ở trang
+// ngoài hiển thị giống lúc soạn. Phần chữ chỉnh thêm ở globals.css.
+import "ckeditor5/ckeditor5-content.css";
+
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(
@@ -59,12 +63,6 @@ export default async function ArticlePage(
 
   await recordArticleView(article.slug);
 
-  // Tách đoạn theo dòng trống — khớp với hướng dẫn ghi trên form soạn bài.
-  const paragraphs = article.content
-    .split(/\n\s*\n/)
-    .map((block) => block.trim())
-    .filter(Boolean);
-
   return (
     <>
       <section className="bg-ink-900 text-white">
@@ -96,21 +94,22 @@ export default async function ArticlePage(
       <article className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-6">
         {article.coverImage && (
           // Ảnh bìa là URL tuỳ ý do admin nhập nên dùng thẻ img thường.
+          // Khung cao cố định, ảnh cắt vừa khung: ảnh dọc hay ảnh quá khổ
+          // không chiếm trọn màn hình.
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={article.coverImage}
             alt=""
-            className="mb-10 w-full rounded-2xl border border-black/10 object-cover"
+            className="mb-10 h-60 w-full rounded-2xl border border-black/10 object-cover sm:h-96"
           />
         )}
 
-        <div className="space-y-5 text-[1.0625rem] leading-relaxed text-black/75">
-          {paragraphs.map((paragraph, index) => (
-            <p key={index} className="whitespace-pre-line">
-              {paragraph}
-            </p>
-          ))}
-        </div>
+        {/* HTML đã được backend lọc theo allowlist cả lúc lưu lẫn lúc đọc ra
+            (backend/src/articles/article-content.ts). */}
+        <div
+          className="ck-content article-content"
+          dangerouslySetInnerHTML={{ __html: article.content }}
+        />
 
         <footer className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-black/10 pt-6 text-sm">
           <p className="text-black/50">

@@ -26,6 +26,23 @@ export const COMPANY_PROFILE = {
   workingHours: "Thứ 2 – Thứ 6, 08:00 – 17:30",
 } as const;
 
+/**
+ * Tài khoản nhận chuyển khoản cho đơn hàng. Hiện ở trang đặt hàng, màn hình
+ * đặt thành công và đơn chưa thanh toán trong trang cá nhân.
+ */
+export const COMPANY_BANK = {
+  accountName: "LÊ TRUNG ĐỨC",
+  accountNumber: "7992456789",
+  bankName: "Techcombank",
+} as const;
+
+/**
+ * Mã VietQR của tài khoản trên (cắt từ ảnh app Techcombank). Mã tĩnh: chỉ
+ * chứa ngân hàng + số tài khoản, không có số tiền/nội dung. Đổi tài khoản
+ * thì thay cả ảnh này.
+ */
+export const COMPANY_BANK_QR = "/bank-qr.png";
+
 /** Địa chỉ đầy đủ một dòng. */
 export const COMPANY_ADDRESS = [
   COMPANY_PROFILE.address,

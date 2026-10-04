@@ -259,6 +259,21 @@ export class CategoryDetailsService {
       );
     }
 
+    // Lĩnh vực sản phẩm: cùng lý do như chuyên mục bài viết ở trên.
+    const products = this.sqlite.db
+      .prepare(
+        'SELECT COUNT(*) AS total FROM products WHERE categoryDetailId = ?',
+      )
+      .get(id) as { total: number | bigint } | undefined;
+
+    const productCount = Number(products?.total ?? 0);
+    if (productCount > 0) {
+      throw new ConflictException(
+        `Lĩnh vực này đang có ${productCount} sản phẩm. ` +
+          'Hãy chuyển các sản phẩm sang lĩnh vực khác hoặc xoá chúng trước.',
+      );
+    }
+
     this.sqlite.db
       .prepare('DELETE FROM category_details WHERE id = ? AND categoryId = ?')
       .run(id, categoryId);
