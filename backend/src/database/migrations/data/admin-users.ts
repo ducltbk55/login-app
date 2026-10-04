@@ -36,11 +36,12 @@ export const ADMIN_USERS: UserSeed[] = [
     createdAt: '2026-10-04T13:37:40.585Z',
     lastLoginAt: '2026-10-04T13:38:38.138Z',
     loginCount: 1,
-    phone: '0982190892',
+    // Hồ sơ cá nhân không đưa vào code; tự khai lại sau khi đăng nhập.
+    phone: null,
     gender: 'male',
-    birthDate: '1992-07-21',
-    addressLine: 'Xóm Đồng Văn',
-    provinceCode: '40',
-    wardCode: '17287',
+    birthDate: null,
+    addressLine: null,
+    provinceCode: null,
+    wardCode: null,
   },
 ];

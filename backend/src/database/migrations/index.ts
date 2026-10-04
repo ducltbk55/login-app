@@ -1,5 +1,7 @@
 import type { DatabaseService } from '../database.service';
 import { applyCategorySeeds } from '../category-seed';
+import { applyUserSeeds } from '../user-seed';
+import { ADMIN_USERS } from './data/admin-users';
 import { CATEGORIES_FROM_SQLITE } from './data/categories-from-sqlite';
 
 export type Migration = {
@@ -23,6 +25,13 @@ export const MIGRATIONS: readonly Migration[] = [
     name: '2026-10-04-001-categories-from-sqlite',
     async up(db) {
       await applyCategorySeeds(db, CATEGORIES_FROM_SQLITE);
+    },
+  },
+  {
+    // Tài khoản admin có sẵn, để DB mới đăng nhập là có admin ngay.
+    name: '2026-10-04-002-admin-users',
+    async up(db) {
+      await applyUserSeeds(db, ADMIN_USERS);
     },
   },
 ];

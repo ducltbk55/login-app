@@ -108,6 +108,12 @@ require() {
 
 if [[ "$INSTALLED" == "true" ]]; then
   DEPLOY_PATH="$(dirname "$ROOT")"
+elif [[ "$TARGET" == "production" && -n "${DEPLOY_PATH:-}" ]]; then
+  # Lúc đọc file .env, bash đã đổi `~` thành home của máy local; trả lại `~`
+  # để nó trỏ về home của SERVER_USER trên máy chủ.
+  case "$DEPLOY_PATH" in
+    "$HOME" | "$HOME"/*) DEPLOY_PATH="~${DEPLOY_PATH#"$HOME"}" ;;
+  esac
 fi
 
 # Local luôn build & chạy thẳng từ thư mục mã nguồn này, không chép đi đâu.
@@ -197,6 +203,24 @@ cmd_deploy() {
     else
       die "Máy đích chưa có Docker + Compose plugin. Cài Docker, hoặc đặt INSTALL_DOCKER=true (production)."
     fi
+  fi
+
+  if [[ "$TARGET" == "production" ]]; then
+    # Docker vừa cài chỉ root dùng được: thêm user SSH vào nhóm docker (cần sudo
+    # không mật khẩu), rồi đóng kết nối SSH dùng chung để phiên sau nhận nhóm mới.
+    if ! remote "docker info >/dev/null 2>&1"; then
+      log "Cấp quyền Docker cho $SERVER_USER"
+      remote "sudo -n usermod -aG docker \"\$(id -un)\"" ||
+        die "Không thêm được $SERVER_USER vào nhóm docker (cần sudo không mật khẩu)."
+      ssh "${SSH_OPTS[@]}" -O exit "$SERVER_USER@$SERVER_HOST" 2>/dev/null || true
+      remote "docker info >/dev/null 2>&1" ||
+        die "$SERVER_USER vẫn chưa dùng được Docker — kiểm tra trên máy chủ: docker info"
+    fi
+
+    # DEPLOY_PATH ở nơi cần root (vd. /opt): tạo bằng sudo rồi giao cho user SSH.
+    remote "$REMOTE_DIR_EXPR; mkdir -p \"\$d\" 2>/dev/null && [ -w \"\$d\" ] ||
+      { sudo -n mkdir -p \"\$d\" && sudo -n chown \"\$(id -u):\$(id -g)\" \"\$d\"; }" ||
+      die "Không tạo được $DEPLOY_PATH (cần sudo không mật khẩu, hoặc đổi DEPLOY_PATH sang ~/...)."
   fi
 
   if [[ "$IN_PLACE" == "true" ]]; then
