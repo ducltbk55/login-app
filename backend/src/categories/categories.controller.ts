@@ -25,31 +25,33 @@ export class CategoriesController {
   constructor(private readonly categories: CategoriesService) {}
 
   @Get()
-  list(@Query() query: ListCategoriesDto): Paginated<CategorySummary> {
-    return paginate(this.categories.list(query), query);
+  async list(
+    @Query() query: ListCategoriesDto,
+  ): Promise<Paginated<CategorySummary>> {
+    return paginate(await this.categories.list(query), query);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number): Category {
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Category> {
     return this.categories.findOneOrFail(id);
   }
 
   @Post()
-  create(@Body() dto: CreateCategoryDto): Category {
+  async create(@Body() dto: CreateCategoryDto): Promise<Category> {
     return this.categories.create(dto);
   }
 
   @Patch(':id')
-  update(
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCategoryDto,
-  ): Category {
+  ): Promise<Category> {
     return this.categories.update(id, dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id', ParseIntPipe) id: number): void {
-    this.categories.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    await this.categories.remove(id);
   }
 }

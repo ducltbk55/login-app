@@ -46,7 +46,10 @@ export function CartView() {
     return (
       <div className="space-y-3" aria-busy="true">
         {cart.map((line) => (
-          <div key={line.id} className="h-28 animate-pulse rounded-2xl bg-black/5" />
+          <div
+            key={line.id}
+            className="h-28 animate-pulse rounded-2xl bg-black/5"
+          />
         ))}
       </div>
     );
@@ -65,7 +68,10 @@ export function CartView() {
               className="flex gap-4 rounded-2xl border border-black/10 bg-white p-4"
             >
               <Link href={`/san-pham/${product.slug}`} className="shrink-0">
-                <ProductImage product={product} className="size-24 rounded-xl" />
+                <ProductImage
+                  product={product}
+                  className="size-24 rounded-xl"
+                />
               </Link>
 
               <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -99,7 +105,9 @@ export function CartView() {
                     {product.salePrice !== null && product.price !== null && (
                       <>
                         {" "}
-                        <s className="text-black/45">{formatVnd(product.price)}</s>{" "}
+                        <s className="text-black/45">
+                          {formatVnd(product.price)}
+                        </s>{" "}
                         <span className="text-xs font-semibold text-red-600">
                           −{product.discountPercent}%
                         </span>
@@ -123,7 +131,9 @@ export function CartView() {
                       inputMode="numeric"
                       value={qty}
                       onChange={(event) => {
-                        const next = Number(event.target.value.replace(/\D/g, ""));
+                        const next = Number(
+                          event.target.value.replace(/\D/g, ""),
+                        );
                         if (next > 0) setCartQty(product.id, next);
                       }}
                       className="w-12 border-x border-black/15 py-1.5 text-center text-sm tabular-nums outline-none"
@@ -185,7 +195,10 @@ export function CartView() {
         )}
 
         <div className="mt-5 flex justify-between text-sm">
-          <Link href="/san-pham" className="font-medium text-gold-700 hover:underline">
+          <Link
+            href="/san-pham"
+            className="font-medium text-gold-700 hover:underline"
+          >
             ← Tiếp tục mua
           </Link>
           <button

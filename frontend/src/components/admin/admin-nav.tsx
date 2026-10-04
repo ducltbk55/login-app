@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType, SVGProps } from "react";
 
+import type { AdminMenuItem, AdminSectionCode } from "@/lib/access";
+
 import {
   BoxIcon,
   DashboardIcon,
@@ -15,37 +17,57 @@ import {
   UsersIcon,
 } from "@/components/admin/icons";
 
+type Icon = ComponentType<SVGProps<SVGSVGElement>>;
+
 type NavItem = {
   href: string;
   label: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  icon: Icon;
   exact?: boolean;
 };
 
-const ITEMS: NavItem[] = [
-  { href: "/admin", label: "Tổng quan", icon: DashboardIcon, exact: true },
-  { href: "/admin/users", label: "Người dùng", icon: UsersIcon },
-  { href: "/admin/articles", label: "Bài viết", icon: NewspaperIcon },
-  { href: "/admin/products", label: "Sản phẩm", icon: BoxIcon },
-  { href: "/admin/orders", label: "Đơn hàng", icon: ReceiptIcon },
-  { href: "/admin/categories", label: "Danh mục", icon: TagIcon },
-  { href: "/admin/contacts", label: "Liên hệ", icon: MailIcon },
-  { href: "/admin/permission-groups", label: "Nhóm quyền", icon: ShieldIcon },
-];
+/** Icon của từng chức năng; tên và thứ tự mục lấy từ danh mục chức năng. */
+const ICONS: Record<AdminSectionCode, Icon> = {
+  USERS: UsersIcon,
+  ARTICLES: NewspaperIcon,
+  PRODUCTS: BoxIcon,
+  ORDERS: ReceiptIcon,
+  CATEGORIES: TagIcon,
+  CONTACTS: MailIcon,
+  "PERMISSION-GROUPS": ShieldIcon,
+};
+
+const OVERVIEW: NavItem = {
+  href: "/admin",
+  label: "Tổng quan",
+  icon: DashboardIcon,
+  exact: true,
+};
 
 export function AdminNav({
+  items: menu,
   collapsed = false,
   onNavigate,
 }: {
+  /** Mục theo chức năng người dùng có quyền xem, đã sắp thứ tự. */
+  items: AdminMenuItem[];
   /** Chỉ hiện icon, dùng cho sidebar thu gọn trên desktop. */
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const items: NavItem[] = [
+    OVERVIEW,
+    ...menu.map((item) => ({
+      href: item.href,
+      label: item.label,
+      icon: ICONS[item.code],
+    })),
+  ];
 
   return (
     <nav className="flex flex-col gap-1" aria-label="Điều hướng quản trị">
-      {ITEMS.map((item) => {
+      {items.map((item) => {
         const active = item.exact
           ? pathname === item.href
           : pathname.startsWith(item.href);

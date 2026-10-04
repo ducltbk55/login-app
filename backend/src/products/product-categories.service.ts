@@ -22,27 +22,25 @@ export class ProductCategoriesService implements OnModuleInit {
     private readonly details: CategoryDetailsService,
   ) {}
 
-  onModuleInit(): void {
-    this.ensureCategory();
+  async onModuleInit(): Promise<void> {
+    await this.ensureCategory();
   }
 
-  category(): Category | null {
-    return (
-      this.categories.list().find((c) => c.code === PRODUCT_CATEGORY_CODE) ??
-      null
-    );
+  async category(): Promise<Category | null> {
+    const categories = await this.categories.list();
+    return categories.find((c) => c.code === PRODUCT_CATEGORY_CODE) ?? null;
   }
 
   /** Các lĩnh vực đang bật, theo đúng thứ tự hiển thị của danh mục. */
-  list(): CategoryDetail[] {
-    const category = this.category();
+  async list(): Promise<CategoryDetail[]> {
+    const category = await this.category();
     if (!category) return [];
     return this.details.list(category.id, { status: 'active' });
   }
 
   /** Public và idempotent — test gọi lại được. */
-  ensureCategory(): Category {
-    const found = this.category();
+  async ensureCategory(): Promise<Category> {
+    const found = await this.category();
     if (found) return found;
 
     this.logger.log(`Tạo danh mục "${PRODUCT_CATEGORY_NAME}"`);

@@ -1,0 +1,17 @@
+# Chỉ HTTP: deploy local, hoặc lần đầu trên production khi chưa có chứng chỉ.
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    # Ảnh và tệp đính kèm tối đa 5MB, chừa thêm cho phần còn lại của form.
+    client_max_body_size 12m;
+
+    # Let's Encrypt kiểm tra domain qua đường dẫn này.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        include /etc/nginx/proxy.inc;
+    }
+}

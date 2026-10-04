@@ -32,47 +32,47 @@ export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
   @Get()
-  list(@Query() query: ListOrdersDto): Paginated<Order> {
-    return paginate(this.orders.list(query), query);
+  async list(@Query() query: ListOrdersDto): Promise<Paginated<Order>> {
+    return paginate(await this.orders.list(query), query);
   }
 
   /** Đặt trước `:id` — Nest khớp route theo thứ tự khai báo. */
   @Get('stats')
-  stats(): OrderStats {
+  async stats(): Promise<OrderStats> {
     return this.orders.stats();
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number): OrderDetail {
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<OrderDetail> {
     return this.orders.findOneOrFail(id);
   }
 
   @Post()
-  create(@Body() dto: CreateOrderDto): OrderDetail {
+  async create(@Body() dto: CreateOrderDto): Promise<OrderDetail> {
     return this.orders.create(dto);
   }
 
   @Patch(':id/status')
-  updateStatus(
+  async updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateOrderStatusDto,
-  ): OrderDetail {
+  ): Promise<OrderDetail> {
     return this.orders.updateStatus(id, dto);
   }
 
   @Patch(':id/payment')
-  updatePayment(
+  async updatePayment(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdatePaymentStatusDto,
-  ): OrderDetail {
+  ): Promise<OrderDetail> {
     return this.orders.updatePayment(id, dto);
   }
 
   @Patch(':id/note')
-  updateNote(
+  async updateNote(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAdminNoteDto,
-  ): OrderDetail {
+  ): Promise<OrderDetail> {
     return this.orders.updateAdminNote(id, dto);
   }
 }

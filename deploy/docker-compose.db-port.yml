@@ -1,0 +1,6 @@
+# Thêm vào khi DB_PUBLISH_PORT có giá trị (thường chỉ ở local): mở cổng DB ra
+# máy chủ để xem dữ liệu bằng DBeaver/MySQL Workbench. Chỉ nghe trên 127.0.0.1.
+services:
+  db:
+    ports:
+      - "127.0.0.1:${DB_PUBLISH_PORT}:3306"

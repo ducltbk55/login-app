@@ -19,7 +19,8 @@ export type SiteAccountUser = {
   name: string | null;
   email: string;
   image: string | null;
-  isAdmin: boolean;
+  /** Được vào khu quản trị (admin hoặc có nhóm quyền). */
+  canEnterAdmin: boolean;
 };
 
 const MENU_ITEM =
@@ -219,8 +220,8 @@ export function SiteAccountMenu({
               <SettingsIcon className={MENU_ICON} />
               Chỉnh sửa hồ sơ
             </Link>
-            {/* Chỉ hiện với quản trị viên; cổng vào /admin vẫn kiểm tra lại DB. */}
-            {user.isAdmin && (
+            {/* Chỉ hiện với người có quyền quản trị; /admin vẫn tự kiểm tra lại. */}
+            {user.canEnterAdmin && (
               <Link href="/admin" className={MENU_ITEM}>
                 <DashboardIcon className={MENU_ICON} />
                 Trang quản trị

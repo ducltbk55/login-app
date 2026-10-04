@@ -14,6 +14,8 @@ import {
   type Article,
   type ArticleStatus,
 } from "@/lib/articles";
+import { can } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 import {
   BUTTON,
@@ -71,7 +73,24 @@ function StatusAction({ article }: { article: Article }) {
   );
 }
 
-function FeaturedAction({ article }: { article: Article }) {
+function FeaturedAction({
+  article,
+  canWrite,
+}: {
+  article: Article;
+  canWrite: boolean;
+}) {
+  // Không có quyền sửa thì chỉ hiện ngôi sao, không bấm được.
+  if (!canWrite) {
+    return article.featured ? (
+      <span
+        title="Bài nổi bật"
+        className={`${ICON_BUTTON} border-gold-400 text-gold-600`}
+      >
+        ★
+      </span>
+    ) : null;
+  }
   return (
     <form action={toggleArticleFeaturedAction}>
       <input type="hidden" name="id" value={article.id} />
@@ -101,12 +120,11 @@ export default async function AdminArticlesPage(
   const search = pickOne(params.search) ?? "";
   const status = pickOne(params.status) as ArticleStatus | undefined;
   const rawCategory = Number(pickOne(params.categoryDetailId));
-  const categoryDetailId = Number.isInteger(rawCategory) && rawCategory > 0
-    ? rawCategory
-    : undefined;
+  const categoryDetailId =
+    Number.isInteger(rawCategory) && rawCategory > 0 ? rawCategory : undefined;
   const page = Number(pickOne(params.page) ?? 1);
 
-  const [result, categories, all] = await Promise.all([
+  const [result, categories, all, user] = await Promise.all([
     listArticles({
       search,
       status,
@@ -116,7 +134,11 @@ export default async function AdminArticlesPage(
     listArticleCategories(),
     // Ô thống kê nói về toàn hệ thống nên không chịu ảnh hưởng của bộ lọc.
     listArticles({ pageSize: 200 }),
+    currentUser(),
   ]);
+  // Layout chỉ đòi ARTICLES.READ — ẩn những nút người xem không dùng được.
+  const canWrite = can(user!, "ARTICLES.WRITE");
+  const canPublish = can(user!, "ARTICLES.PUBLISH");
 
   const articles = result.items;
   const filtered = Boolean(search || status || categoryDetailId);
@@ -134,14 +156,14 @@ export default async function AdminArticlesPage(
     { label: "Chuyên mục", value: categories.length },
   ];
 
-  const addButton = (
+  const addButton = canWrite ? (
     <Link
       href="/admin/articles/new"
       className={`${BUTTON.primary} w-full sm:w-auto`}
     >
       + Viết bài mới
     </Link>
-  );
+  ) : undefined;
 
   return (
     <div className="space-y-5">
@@ -262,15 +284,19 @@ export default async function AdminArticlesPage(
                 className={`${BUTTON.secondary} ${BUTTON_SM}`}
               >
                 <PencilIcon className="size-3.5" />
-                Sửa
+                {canWrite ? "Sửa" : "Xem"}
               </Link>
-              <StatusAction article={article} />
-              <FeaturedAction article={article} />
-              <DeleteButton
-                id={article.id}
-                action={deleteArticleAction}
-                confirmText={`Xoá bài "${article.title}"? Thao tác này không hoàn tác được.`}
-              />
+              {canPublish && <StatusAction article={article} />}
+              {canWrite && (
+                <FeaturedAction article={article} canWrite={canWrite} />
+              )}
+              {canWrite && (
+                <DeleteButton
+                  id={article.id}
+                  action={deleteArticleAction}
+                  confirmText={`Xoá bài "${article.title}"? Thao tác này không hoàn tác được.`}
+                />
+              )}
             </div>
           </li>
         ))}
@@ -308,7 +334,7 @@ export default async function AdminArticlesPage(
             {articles.map((article) => (
               <tr key={article.id} className={TABLE.tr}>
                 <td className={TABLE.td}>
-                  <FeaturedAction article={article} />
+                  <FeaturedAction article={article} canWrite={canWrite} />
                 </td>
                 <td className={`${TABLE.td} max-w-md`}>
                   <Link
@@ -346,18 +372,20 @@ export default async function AdminArticlesPage(
                   <div className="flex items-center justify-end gap-2">
                     <Link
                       href={`/admin/articles/${article.id}`}
-                      title="Sửa bài viết"
-                      aria-label="Sửa bài viết"
+                      title={canWrite ? "Sửa bài viết" : "Xem bài viết"}
+                      aria-label={canWrite ? "Sửa bài viết" : "Xem bài viết"}
                       className={ICON_BUTTON}
                     >
                       <PencilIcon className="size-4" />
                     </Link>
-                    <StatusAction article={article} />
-                    <DeleteButton
-                      id={article.id}
-                      action={deleteArticleAction}
-                      confirmText={`Xoá bài "${article.title}"? Thao tác này không hoàn tác được.`}
-                    />
+                    {canPublish && <StatusAction article={article} />}
+                    {canWrite && (
+                      <DeleteButton
+                        id={article.id}
+                        action={deleteArticleAction}
+                        confirmText={`Xoá bài "${article.title}"? Thao tác này không hoàn tác được.`}
+                      />
+                    )}
                   </div>
                 </td>
               </tr>

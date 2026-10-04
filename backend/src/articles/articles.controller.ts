@@ -43,8 +43,8 @@ export class ArticlesController {
   ) {}
 
   @Get()
-  list(@Query() query: ListArticlesDto): Paginated<Article> {
-    return paginate(this.articles.list(query), query);
+  async list(@Query() query: ListArticlesDto): Promise<Paginated<Article>> {
+    return paginate(await this.articles.list(query), query);
   }
 
   /**
@@ -52,16 +52,18 @@ export class ArticlesController {
    * biết mã DM_CHUYEN_MUC rồi gọi hai vòng (tìm danh mục → lấy chi tiết).
    */
   @Get('categories')
-  listCategories(@Query('live') live?: string): {
-    id: number;
-    code: string;
-    name: string;
-    articleCount: number;
-  }[] {
-    const counts = this.articles.countsByCategory(
+  async listCategories(@Query('live') live?: string): Promise<
+    {
+      id: number;
+      code: string;
+      name: string;
+      articleCount: number;
+    }[]
+  > {
+    const counts = await this.articles.countsByCategory(
       live === 'true' || live === '1',
     );
-    return this.categories.list().map((detail) => ({
+    return (await this.categories.list()).map((detail) => ({
       id: detail.id,
       code: detail.code,
       name: detail.name,
@@ -71,7 +73,7 @@ export class ArticlesController {
 
   /** Số bài theo chuyên mục, cho bộ lọc ở trang Tin tức. */
   @Get('counts')
-  counts(@Query('live') live?: string): Record<number, number> {
+  counts(@Query('live') live?: string): Promise<Record<number, number>> {
     return this.articles.countsByCategory(live === 'true' || live === '1');
   }
 
@@ -80,8 +82,8 @@ export class ArticlesController {
    * `/articles/slug/...` sẽ rơi vào `:id` và hỏng ở ParseIntPipe.
    */
   @Get('slug/:slug')
-  findBySlug(@Param('slug') slug: string): Article {
-    const article = this.articles.findBySlug(slug);
+  async findBySlug(@Param('slug') slug: string): Promise<Article> {
+    const article = await this.articles.findBySlug(slug);
     if (!article) {
       throw new NotFoundException(`Không tìm thấy bài viết "${slug}"`);
     }
@@ -90,8 +92,8 @@ export class ArticlesController {
 
   @Post('slug/:slug/views')
   @HttpCode(204)
-  recordView(@Param('slug') slug: string): void {
-    this.articles.recordView(slug);
+  async recordView(@Param('slug') slug: string): Promise<void> {
+    await this.articles.recordView(slug);
   }
 
   /** Ảnh chèn trong nội dung bài, tải lên từ CKEditor. Trả về tên file. */
@@ -116,12 +118,12 @@ export class ArticlesController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number): Article {
+  findOne(@Param('id', ParseIntPipe) id: number): Promise<Article> {
     return this.articles.findOneOrFail(id);
   }
 
   @Post()
-  create(@Body() dto: CreateArticleDto): Article {
+  create(@Body() dto: CreateArticleDto): Promise<Article> {
     return this.articles.create(dto);
   }
 
@@ -129,13 +131,13 @@ export class ArticlesController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateArticleDto,
-  ): Article {
+  ): Promise<Article> {
     return this.articles.update(id, dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id', ParseIntPipe) id: number): void {
-    this.articles.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    await this.articles.remove(id);
   }
 }

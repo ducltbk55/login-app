@@ -5,12 +5,12 @@ Monorepo hai phần:
 ```
 login/
 ├── frontend/   Next.js 16 (App Router) + Auth.js v5 — giao diện & luồng OAuth Google
-└── backend/    NestJS 11 + SQLite (node:sqlite) — lưu người dùng & lịch sử đăng nhập
+└── backend/    NestJS 11 + MySQL (mysql2) — lưu người dùng & lịch sử đăng nhập
 ```
 
 - Người dùng bấm **Đăng nhập / Đăng ký với Google** trên frontend.
 - Sau khi Google xác thực, frontend (phía server) gọi `POST /api/users/sync` của backend.
-- Backend quyết định **đăng ký mới** hay **ghi nhận đăng nhập**, lưu vào SQLite và trả về bản ghi.
+- Backend quyết định **đăng ký mới** hay **ghi nhận đăng nhập**, lưu vào MySQL và trả về bản ghi.
 - Trang `/dashboard` đọc lại dữ liệu từ backend nên hiển thị đúng những gì đã lưu trong DB.
 - Tài khoản có `role = admin` thấy thêm link vào **`/admin`**: quản lý người dùng, danh mục
   và nhóm quyền.
@@ -19,8 +19,8 @@ Frontend không nói chuyện trực tiếp với DB; backend là nơi duy nhấ
 
 ## Chạy nhanh
 
-Cần Node.js >= 22.5 (dự án đã test với Node 24 — backend dùng module `node:sqlite` tích hợp,
-không phải cài native module nào).
+Cần Node.js >= 22.5 (dự án đã test với Node 24) và MySQL 8. Backend tự tạo database
+`business-platform` và các bảng khi khởi động — chỉ cần điền `DB_*` trong `backend/.env.local`.
 
 ```bash
 # 1. Cài dependencies cho cả hai
@@ -34,6 +34,15 @@ npm run dev:frontend   # http://localhost:3000
 ```
 
 Các script khác ở thư mục gốc: `npm run build`, `npm run lint`, `npm test`.
+
+## Deploy (Docker + nginx)
+
+```bash
+make init production && make deploy production   # máy chủ qua SSH, tự cấu hình domain + SSL
+make init local && make deploy local             # vào WSL, http://localhost:8080
+```
+
+Chi tiết cấu hình và quy trình: `deploy/README.md`.
 
 ## Biến môi trường
 
@@ -56,7 +65,10 @@ Các script khác ở thư mục gốc: `npm run build`, `npm run lint`, `npm te
 | `PORT` | Cổng backend (mặc định 4000) |
 | `FRONTEND_ORIGIN` | Origin được phép gọi CORS |
 | `BACKEND_API_KEY` | Khoá nội bộ, kiểm tra qua header `x-api-key` |
-| `DATABASE_FILE` | File SQLite, mặc định `data/app.db` |
+| `DB_HOST` / `DB_PORT` | MySQL server, mặc định `127.0.0.1:3306` |
+| `DB_USER` / `DB_PASSWORD` | Tài khoản MySQL |
+| `DB_NAME` | Tên database, mặc định `business-platform` |
+| `UPLOAD_DIR` | Thư mục ảnh/tệp đính kèm, mặc định `data/uploads` |
 
 ## Tạo Google OAuth Client
 
@@ -111,7 +123,9 @@ Tài khoản admin đầu tiên phải nâng quyền từ CLI, sau khi đã đă
 npm --prefix backend run set-role -- ban@gmail.com admin
 ```
 
-## Lược đồ dữ liệu (SQLite)
+## Lược đồ dữ liệu (MySQL)
+
+Lược đồ đầy đủ, hiện hành: `backend/src/database/schema.ts`. Phần dưới là bản tóm tắt ban đầu.
 
 ```sql
 users(id TEXT PK, email TEXT UNIQUE, name, image, provider,

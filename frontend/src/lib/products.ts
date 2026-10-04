@@ -117,8 +117,10 @@ function toQueryString(query: ProductQuery): string {
   if (query.categoryDetailId !== undefined) {
     params.set("categoryDetailId", String(query.categoryDetailId));
   }
-  if (query.minPrice !== undefined) params.set("minPrice", String(query.minPrice));
-  if (query.maxPrice !== undefined) params.set("maxPrice", String(query.maxPrice));
+  if (query.minPrice !== undefined)
+    params.set("minPrice", String(query.minPrice));
+  if (query.maxPrice !== undefined)
+    params.set("maxPrice", String(query.maxPrice));
   if (query.live !== undefined) params.set("live", String(query.live));
   if (query.ids !== undefined) params.set("ids", query.ids.join(","));
   if (query.sort) params.set("sort", query.sort);
@@ -158,9 +160,7 @@ export async function findProduct(
   return requestOptional<Product>(`/products/${segment(id)}`);
 }
 
-export async function findProductBySlug(
-  slug: string,
-): Promise<Product | null> {
+export async function findProductBySlug(slug: string): Promise<Product | null> {
   return requestOptional<Product>(`/products/slug/${segment(slug)}`);
 }
 
@@ -174,9 +174,7 @@ export async function listProductCategories(
   return request<ProductCategory[]>(`/products/categories?live=${live}`);
 }
 
-export async function createProduct(
-  input: SaveProductInput,
-): Promise<Product> {
+export async function createProduct(input: SaveProductInput): Promise<Product> {
   return request<Product>("/products", {
     method: "POST",
     body: JSON.stringify(input),

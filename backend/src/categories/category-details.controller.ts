@@ -29,44 +29,44 @@ export class CategoryDetailsController {
   constructor(private readonly details: CategoryDetailsService) {}
 
   @Get()
-  list(
+  async list(
     @Param('categoryId', ParseIntPipe) categoryId: number,
     @Query() query: ListCategoryDetailsDto,
-  ): Paginated<CategoryDetail> {
-    return paginate(this.details.list(categoryId, query), query);
+  ): Promise<Paginated<CategoryDetail>> {
+    return paginate(await this.details.list(categoryId, query), query);
   }
 
   @Get(':id')
-  findOne(
+  async findOne(
     @Param('categoryId', ParseIntPipe) categoryId: number,
     @Param('id', ParseIntPipe) id: number,
-  ): CategoryDetail {
+  ): Promise<CategoryDetail> {
     return this.details.findOneOrFail(categoryId, id);
   }
 
   @Post()
-  create(
+  async create(
     @Param('categoryId', ParseIntPipe) categoryId: number,
     @Body() dto: CreateCategoryDetailDto,
-  ): CategoryDetail {
+  ): Promise<CategoryDetail> {
     return this.details.create(categoryId, dto);
   }
 
   @Patch(':id')
-  update(
+  async update(
     @Param('categoryId', ParseIntPipe) categoryId: number,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCategoryDetailDto,
-  ): CategoryDetail {
+  ): Promise<CategoryDetail> {
     return this.details.update(categoryId, id, dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(
+  async remove(
     @Param('categoryId', ParseIntPipe) categoryId: number,
     @Param('id', ParseIntPipe) id: number,
-  ): void {
-    this.details.remove(categoryId, id);
+  ): Promise<void> {
+    await this.details.remove(categoryId, id);
   }
 }

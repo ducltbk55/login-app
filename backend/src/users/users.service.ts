@@ -9,7 +9,7 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import { matchesSearch } from '../common/search';
-import { SqliteService } from '../database/sqlite.service';
+import { DatabaseService } from '../database/database.service';
 import { AddressService } from '../categories/address.service';
 import { PermissionCatalogService } from '../permission-groups/permission-catalog.service';
 import { PermissionGroupsService } from '../permission-groups/permission-groups.service';
@@ -42,7 +42,7 @@ const PROFILE_FIELDS = [
   'wardCode',
 ] as const satisfies readonly (keyof UserRow)[];
 
-/** node:sqlite trả cột INTEGER có thể là bigint, nên ép về number khi đọc ra. */
+/** Ép các cột số về number cho chắc khi đọc ra. */
 function toUser(row: UserRow): User {
   return {
     ...row,
@@ -58,7 +58,7 @@ export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
   constructor(
-    private readonly sqlite: SqliteService,
+    private readonly db: DatabaseService,
     private readonly groups: PermissionGroupsService,
     private readonly catalog: PermissionCatalogService,
     private readonly address: AddressService,
@@ -75,9 +75,9 @@ export class UsersService {
    * vào được ngay. Giờ đăng ký chỉ tạo hồ sơ ở trạng thái chờ duyệt, còn đăng
    * nhập đòi tài khoản đã tồn tại và đang hoạt động.
    */
-  sync(dto: SyncUserDto): SyncResult {
+  async sync(dto: SyncUserDto): Promise<SyncResult> {
     // Đọc và ghi trong cùng transaction để hai request song song không cùng INSERT.
-    const result = this.sqlite.transaction<SyncResult>(() =>
+    const result = await this.db.transaction<SyncResult>(() =>
       dto.mode === 'register' ? this.register(dto) : this.login(dto),
     );
 
@@ -89,23 +89,23 @@ export class UsersService {
   }
 
   /** Tạo tài khoản mới ở trạng thái chờ duyệt; chưa tính là một lần đăng nhập. */
-  private register(dto: SyncUserDto): SyncResult {
-    if (this.findByEmail(dto.email)) {
+  private async register(dto: SyncUserDto): Promise<SyncResult> {
+    if (await this.findByEmail(dto.email)) {
       throw new ConflictException(
         'Email này đã đăng ký. Hãy đăng nhập thay vì đăng ký lại.',
       );
     }
 
     return {
-      user: this.insertUser(dto, new Date().toISOString()),
+      user: await this.insertUser(dto, new Date().toISOString()),
       isNewUser: true,
     };
   }
 
   /** Ghi nhận đăng nhập; chỉ tài khoản đã duyệt mới qua được. */
-  private login(dto: SyncUserDto): SyncResult {
+  private async login(dto: SyncUserDto): Promise<SyncResult> {
     const now = new Date().toISOString();
-    const existing = this.findByEmail(dto.email);
+    const existing = await this.findByEmail(dto.email);
 
     if (!existing) {
       throw new NotFoundException(
@@ -121,27 +121,27 @@ export class UsersService {
       throw new ForbiddenException('Tài khoản đã bị khoá');
     }
 
-    const user = this.recordLogin(existing, dto, now);
+    const user = await this.recordLogin(existing, dto, now);
 
-    this.sqlite.db
-      .prepare(
-        `INSERT INTO login_events (userId, provider, occurredAt)
-         VALUES (?, ?, ?)`,
-      )
-      .run(user.id, dto.provider, now);
+    await this.db.run(
+      `INSERT INTO login_events (userId, provider, occurredAt)
+       VALUES (?, ?, ?)`,
+      [user.id, dto.provider, now],
+    );
 
     return { user, isNewUser: false };
   }
 
-  findByEmail(email: string): User | null {
-    const row = this.sqlite.db
-      .prepare('SELECT * FROM users WHERE email = ?')
-      .get(email) as UserRow | undefined;
+  async findByEmail(email: string): Promise<User | null> {
+    const row = await this.db.get<UserRow>(
+      'SELECT * FROM users WHERE email = ?',
+      [email],
+    );
     return row ? toUser(row) : null;
   }
 
-  findByEmailOrFail(email: string): User {
-    const user = this.findByEmail(email);
+  async findByEmailOrFail(email: string): Promise<User> {
+    const user = await this.findByEmail(email);
     if (!user) {
       throw new NotFoundException(
         `Không tìm thấy người dùng với email ${email}`,
@@ -151,15 +151,15 @@ export class UsersService {
   }
 
   /** Tra theo khoá chính. Chỉ dùng cho đăng nhập-theo-id lúc phát triển. */
-  findById(id: number): User | null {
-    const row = this.sqlite.db
-      .prepare('SELECT * FROM users WHERE id = ?')
-      .get(id) as UserRow | undefined;
+  async findById(id: number): Promise<User | null> {
+    const row = await this.db.get<UserRow>('SELECT * FROM users WHERE id = ?', [
+      id,
+    ]);
     return row ? toUser(row) : null;
   }
 
-  findDetailByIdOrFail(id: number): UserDetail {
-    const user = this.findById(id);
+  async findDetailByIdOrFail(id: number): Promise<UserDetail> {
+    const user = await this.findById(id);
     if (!user) {
       throw new NotFoundException(`Không tìm thấy người dùng với id ${id}`);
     }
@@ -167,21 +167,21 @@ export class UsersService {
   }
 
   /** Bản ghi kèm nhóm quyền + quyền hiệu lực, dùng cho trang chi tiết admin. */
-  findDetailOrFail(email: string): UserDetail {
-    return this.withGroups(this.findByEmailOrFail(email));
+  async findDetailOrFail(email: string): Promise<UserDetail> {
+    return this.withGroups(await this.findByEmailOrFail(email));
   }
 
   /** Gắn nhóm quyền + quyền hiệu lực vào một bản ghi đã tra được. */
-  private withGroups(user: User): UserDetail {
-    const groups = this.findGroups(user.id);
+  private async withGroups(user: User): Promise<UserDetail> {
+    const groups = await this.findGroups(user.id);
     return {
       ...user,
       groups,
-      permissions: this.effectivePermissions(user, groups),
+      permissions: await this.effectivePermissions(user, groups),
     };
   }
 
-  findAll(query: ListUsersDto = {}): User[] {
+  async findAll(query: ListUsersDto = {}): Promise<User[]> {
     const where: string[] = [];
     const params: string[] = [];
 
@@ -194,13 +194,12 @@ export class UsersService {
       params.push(query.status);
     }
 
-    const rows = this.sqlite.db
-      .prepare(
-        `SELECT * FROM users
-         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-         ORDER BY createdAt DESC`,
-      )
-      .all(...params) as UserRow[];
+    const rows = await this.db.all<UserRow>(
+      `SELECT * FROM users
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       ORDER BY createdAt DESC`,
+      params,
+    );
 
     const items = rows.map(toUser);
     if (!query.search) return items;
@@ -210,25 +209,26 @@ export class UsersService {
     );
   }
 
-  countAll(): number {
-    const row = this.sqlite.db
-      .prepare('SELECT COUNT(*) AS total FROM users')
-      .get() as { total: number } | undefined;
+  async countAll(): Promise<number> {
+    const row = await this.db.get<{ total: number }>(
+      'SELECT COUNT(*) AS total FROM users',
+    );
     return Number(row?.total ?? 0);
   }
 
-  stats(): UserStats {
-    const row = this.sqlite.db
-      .prepare(
-        `SELECT COUNT(*) AS total,
-                SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admins,
-                SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) AS pending,
-                SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END) AS blocked
-           FROM users`,
-      )
-      .get() as
-      | { total: number; admins: number; pending: number; blocked: number }
-      | undefined;
+  async stats(): Promise<UserStats> {
+    const row = await this.db.get<{
+      total: number;
+      admins: number;
+      pending: number;
+      blocked: number;
+    }>(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admins,
+              SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) AS pending,
+              SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END) AS blocked
+         FROM users`,
+    );
 
     return {
       total: Number(row?.total ?? 0),
@@ -239,8 +239,8 @@ export class UsersService {
   }
 
   /** Đổi vai trò / trạng thái. Chặn việc vô tình bỏ mất admin cuối cùng. */
-  update(email: string, dto: UpdateUserDto): UserDetail {
-    const user = this.findByEmailOrFail(email);
+  async update(email: string, dto: UpdateUserDto): Promise<UserDetail> {
+    const user = await this.findByEmailOrFail(email);
     const role = dto.role ?? user.role;
     const status = dto.status ?? user.status;
 
@@ -249,15 +249,17 @@ export class UsersService {
       user.status === 'active' &&
       (role !== 'admin' || status !== 'active');
 
-    if (losesAdmin && this.countActiveAdmins() <= 1) {
+    if (losesAdmin && (await this.countActiveAdmins()) <= 1) {
       throw new ForbiddenException(
         'Đây là admin duy nhất đang hoạt động — hãy chỉ định admin khác trước',
       );
     }
 
-    this.sqlite.db
-      .prepare('UPDATE users SET role = ?, status = ? WHERE id = ?')
-      .run(role, status, user.id);
+    await this.db.run('UPDATE users SET role = ?, status = ? WHERE id = ?', [
+      role,
+      status,
+      user.id,
+    ]);
 
     this.logger.log(`Cập nhật ${email}: role=${role}, status=${status}`);
     return this.findDetailOrFail(email);
@@ -269,22 +271,23 @@ export class UsersService {
    * Tách khỏi `update` (vốn dành cho admin đổi vai trò/trạng thái) để chủ tài
    * khoản không bao giờ chạm được vào role và status của chính mình.
    */
-  updateProfile(email: string, dto: UpdateProfileDto): UserDetail {
-    const user = this.findByEmailOrFail(email);
-    this.address.assertValidAddress(dto.provinceCode, dto.wardCode);
+  async updateProfile(
+    email: string,
+    dto: UpdateProfileDto,
+  ): Promise<UserDetail> {
+    const user = await this.findByEmailOrFail(email);
+    await this.address.assertValidAddress(dto.provinceCode, dto.wardCode);
 
     if (new Date(dto.birthDate) > new Date()) {
       throw new BadRequestException('Ngày sinh không thể ở tương lai');
     }
 
-    this.sqlite.db
-      .prepare(
-        `UPDATE users
-            SET phone = ?, gender = ?, birthDate = ?,
-                addressLine = ?, provinceCode = ?, wardCode = ?
-          WHERE id = ?`,
-      )
-      .run(
+    await this.db.run(
+      `UPDATE users
+          SET phone = ?, gender = ?, birthDate = ?,
+              addressLine = ?, provinceCode = ?, wardCode = ?
+        WHERE id = ?`,
+      [
         dto.phone,
         dto.gender,
         dto.birthDate,
@@ -292,48 +295,48 @@ export class UsersService {
         dto.provinceCode,
         dto.wardCode,
         user.id,
-      );
+      ],
+    );
 
     this.logger.log(`Cập nhật hồ sơ: ${email}`);
     return this.findDetailOrFail(email);
   }
 
   /** Thay toàn bộ danh sách nhóm quyền của một user. */
-  setGroups(email: string, dto: AssignGroupsDto): UserDetail {
-    const user = this.findByEmailOrFail(email);
-    this.groups.assertAllExist(dto.groupIds);
+  async setGroups(email: string, dto: AssignGroupsDto): Promise<UserDetail> {
+    const user = await this.findByEmailOrFail(email);
+    await this.groups.assertAllExist(dto.groupIds);
 
-    this.sqlite.transaction(() => {
-      this.sqlite.db
-        .prepare('DELETE FROM user_permission_groups WHERE userId = ?')
-        .run(user.id);
+    await this.db.transaction(async () => {
+      await this.db.run('DELETE FROM user_permission_groups WHERE userId = ?', [
+        user.id,
+      ]);
 
-      const insert = this.sqlite.db.prepare(
-        `INSERT INTO user_permission_groups (userId, groupId, assignedAt)
-         VALUES (?, ?, ?)`,
-      );
       const now = new Date().toISOString();
       for (const groupId of new Set(dto.groupIds)) {
-        insert.run(user.id, groupId, now);
+        await this.db.run(
+          `INSERT INTO user_permission_groups (userId, groupId, assignedAt)
+           VALUES (?, ?, ?)`,
+          [user.id, groupId, now],
+        );
       }
     });
 
     return this.findDetailOrFail(email);
   }
 
-  findLoginHistory(
+  async findLoginHistory(
     email: string,
     limit = DEFAULT_LOGIN_HISTORY_LIMIT,
-  ): LoginEvent[] {
-    const user = this.findByEmailOrFail(email);
-    const rows = this.sqlite.db
-      .prepare(
-        `SELECT * FROM login_events
-          WHERE userId = ?
-          ORDER BY occurredAt DESC
-          LIMIT ?`,
-      )
-      .all(user.id, clampLimit(limit)) as LoginEvent[];
+  ): Promise<LoginEvent[]> {
+    const user = await this.findByEmailOrFail(email);
+    const rows = await this.db.all<LoginEvent>(
+      `SELECT * FROM login_events
+        WHERE userId = ?
+        ORDER BY occurredAt DESC, id DESC
+        LIMIT ?`,
+      [user.id, clampLimit(limit)],
+    );
 
     return rows.map((row) => ({
       ...row,
@@ -342,53 +345,52 @@ export class UsersService {
     }));
   }
 
-  private countActiveAdmins(): number {
-    const row = this.sqlite.db
-      .prepare(
-        `SELECT COUNT(*) AS total FROM users
-          WHERE role = 'admin' AND status = 'active'`,
-      )
-      .get() as { total: number } | undefined;
+  private async countActiveAdmins(): Promise<number> {
+    const row = await this.db.get<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM users
+        WHERE role = 'admin' AND status = 'active'`,
+    );
     return Number(row?.total ?? 0);
   }
 
-  private findGroups(userId: number): UserGroupRef[] {
-    const rows = this.sqlite.db
-      .prepare(
-        `SELECT g.id, g.name, g.slug
-           FROM user_permission_groups ug
-           JOIN permission_groups g ON g.id = ug.groupId
-          WHERE ug.userId = ?
-          ORDER BY g.name COLLATE NOCASE`,
-      )
-      .all(userId) as UserGroupRef[];
+  private async findGroups(userId: number): Promise<UserGroupRef[]> {
+    const rows = await this.db.all<UserGroupRef>(
+      `SELECT g.id, g.name, g.slug
+         FROM user_permission_groups ug
+         JOIN permission_groups g ON g.id = ug.groupId
+        WHERE ug.userId = ?
+        ORDER BY g.name`,
+      [userId],
+    );
 
     return rows.map((row) => ({ ...row, id: Number(row.id) }));
   }
 
   /** Role admin được coi là có toàn bộ quyền, khỏi phải tự gán nhóm cho mình. */
-  private effectivePermissions(user: User, groups: UserGroupRef[]): string[] {
+  private async effectivePermissions(
+    user: User,
+    groups: UserGroupRef[],
+  ): Promise<string[]> {
     if (user.role === 'admin') return this.catalog.keys();
     if (groups.length === 0) return [];
 
-    const rows = this.sqlite.db
-      .prepare(
-        `SELECT DISTINCT permission
-           FROM permission_group_permissions
-          WHERE groupId IN (${groups.map(() => '?').join(', ')})
-          ORDER BY permission`,
-      )
-      .all(...groups.map((g) => g.id)) as { permission: string }[];
+    const rows = await this.db.all<{ permission: string }>(
+      `SELECT DISTINCT permission
+         FROM permission_group_permissions
+        WHERE groupId IN (${groups.map(() => '?').join(', ')})
+        ORDER BY permission COLLATE utf8mb4_bin`,
+      groups.map((g) => g.id),
+    );
 
     return rows.map((r) => r.permission);
   }
 
   /**
-   * Tài khoản mới: INSERT bản ghi đầu tiên; `id` do SQLite tự cấp.
+   * Tài khoản mới: INSERT bản ghi đầu tiên; `id` do MySQL tự cấp.
    * `status` là `inactive` và `loginCount` là 0 — chưa duyệt thì chưa đăng
    * nhập được lần nào.
    */
-  private insertUser(dto: SyncUserDto, now: string): User {
+  private async insertUser(dto: SyncUserDto, now: string): Promise<User> {
     const user: Omit<User, 'id' | 'profileCompleted'> = {
       accountId: randomUUID(),
       phone: null,
@@ -408,14 +410,12 @@ export class UsersService {
       loginCount: 0,
     };
 
-    const result = this.sqlite.db
-      .prepare(
-        `INSERT INTO users
-           (accountId, email, name, image, provider, role, status,
-            createdAt, lastLoginAt, loginCount)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
+    const result = await this.db.run(
+      `INSERT INTO users
+         (accountId, email, name, image, provider, role, status,
+          createdAt, lastLoginAt, loginCount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
         user.accountId,
         user.email,
         user.name,
@@ -426,27 +426,31 @@ export class UsersService {
         user.createdAt,
         user.lastLoginAt,
         user.loginCount,
-      );
+      ],
+    );
 
     return {
       ...user,
-      id: Number(result.lastInsertRowid),
+      id: result.lastInsertId,
       profileCompleted: false,
     };
   }
 
   /** Tài khoản đã có: cập nhật tên/ảnh mới nhất từ Google và tăng loginCount. */
-  private recordLogin(existing: User, dto: SyncUserDto, now: string): User {
-    this.sqlite.db
-      .prepare(
-        `UPDATE users
-            SET name = COALESCE(?, name),
-                image = COALESCE(?, image),
-                lastLoginAt = ?,
-                loginCount = loginCount + 1
-          WHERE id = ?`,
-      )
-      .run(dto.name ?? null, dto.image ?? null, now, existing.id);
+  private async recordLogin(
+    existing: User,
+    dto: SyncUserDto,
+    now: string,
+  ): Promise<User> {
+    await this.db.run(
+      `UPDATE users
+          SET name = COALESCE(?, name),
+              image = COALESCE(?, image),
+              lastLoginAt = ?,
+              loginCount = loginCount + 1
+        WHERE id = ?`,
+      [dto.name ?? null, dto.image ?? null, now, existing.id],
+    );
 
     return {
       ...existing,

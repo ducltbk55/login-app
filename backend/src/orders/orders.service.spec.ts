@@ -1,19 +1,16 @@
 import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 
 import { CategoriesModule } from '../categories/categories.module';
 import { CategoryDetailsService } from '../categories/category-details.service';
 import { DatabaseModule } from '../database/database.module';
+import { testDatabaseConfig } from '../database/testing';
 import { ProductCategoriesService } from '../products/product-categories.service';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService', () => {
   let moduleRef: TestingModule;
-  let tempDir: string;
   let orders: OrdersService;
   let products: ProductsService;
 
@@ -35,14 +32,12 @@ describe('OrdersService', () => {
   ) => orders.create({ ...customer, ...extra, items });
 
   beforeEach(async () => {
-    tempDir = mkdtempSync(path.join(tmpdir(), 'nest-orders-'));
-
     moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
           ignoreEnvFile: true,
-          load: [() => ({ DATABASE_FILE: path.join(tempDir, 'test.db') })],
+          load: [() => testDatabaseConfig()],
         }),
         DatabaseModule,
         CategoriesModule,
@@ -54,34 +49,43 @@ describe('OrdersService', () => {
     orders = moduleRef.get(OrdersService);
     products = moduleRef.get(ProductsService);
 
-    const category = moduleRef.get(ProductCategoriesService).ensureCategory();
-    const categoryDetailId = moduleRef
-      .get(CategoryDetailsService)
-      .create(category.id, { code: 'PM', name: 'Phần mềm' }).id;
+    const category = await moduleRef
+      .get(ProductCategoriesService)
+      .ensureCategory();
+    const categoryDetailId = (
+      await moduleRef
+        .get(CategoryDetailsService)
+        .create(category.id, { code: 'PM', name: 'Phần mềm' })
+    ).id;
 
-    const make = (name: string, extra: Record<string, unknown>) =>
-      products.create({ categoryDetailId, name, status: 'published', ...extra })
-        .id;
+    const make = async (name: string, extra: Record<string, unknown>) =>
+      (
+        await products.create({
+          categoryDetailId,
+          name,
+          status: 'published',
+          ...extra,
+        })
+      ).id;
 
-    sale = make('Có khuyến mãi', {
+    sale = await make('Có khuyến mãi', {
       price: 10_000_000,
       salePrice: 8_000_000,
       sku: 'KM-1',
     });
-    plain = make('Giá thường', { price: 3_000_000 });
-    noPrice = make('Chưa có giá', {});
-    outOfStock = make('Hết hàng', { price: 1_000_000, inStock: false });
-    draft = make('Bản nháp', { price: 1_000_000, status: 'draft' });
+    plain = await make('Giá thường', { price: 3_000_000 });
+    noPrice = await make('Chưa có giá', {});
+    outOfStock = await make('Hết hàng', { price: 1_000_000, inStock: false });
+    draft = await make('Bản nháp', { price: 1_000_000, status: 'draft' });
   });
 
   afterEach(async () => {
     await moduleRef.close();
-    rmSync(tempDir, { recursive: true, force: true });
   });
 
   describe('đặt hàng', () => {
-    it('tính tiền ở server, chụp lại tên/giá, trạng thái ban đầu', () => {
-      const created = order([
+    it('tính tiền ở server, chụp lại tên/giá, trạng thái ban đầu', async () => {
+      const created = await order([
         { productId: sale, quantity: 2 },
         { productId: plain, quantity: 1 },
       ]);
@@ -108,15 +112,15 @@ describe('OrdersService', () => {
       ]);
     });
 
-    it('mã đơn tăng dần trong ngày', () => {
-      const first = order([{ productId: plain, quantity: 1 }]);
-      const second = order([{ productId: plain, quantity: 1 }]);
+    it('mã đơn tăng dần trong ngày', async () => {
+      const first = await order([{ productId: plain, quantity: 1 }]);
+      const second = await order([{ productId: plain, quantity: 1 }]);
       expect(second.code.slice(-4)).toBe('0002');
       expect(second.code.slice(0, -4)).toBe(first.code.slice(0, -4));
     });
 
-    it('gộp dòng trùng sản phẩm', () => {
-      const created = order([
+    it('gộp dòng trùng sản phẩm', async () => {
+      const created = await order([
         { productId: plain, quantity: 1 },
         { productId: plain, quantity: 2 },
       ]);
@@ -129,22 +133,25 @@ describe('OrdersService', () => {
       ['chưa có giá', () => noPrice, 'chưa có giá'],
       ['bản nháp', () => draft, 'ngừng bán'],
       ['không tồn tại', () => 999_999, 'ngừng bán'],
-    ])('chặn sản phẩm %s, không tạo đơn dở dang', (_label, id, message) => {
-      expect(() =>
-        order([
-          { productId: plain, quantity: 1 },
-          { productId: id(), quantity: 1 },
-        ]),
-      ).toThrow(message);
-      expect(orders.list()).toEqual([]);
-    });
+    ])(
+      'chặn sản phẩm %s, không tạo đơn dở dang',
+      async (_label, id, message) => {
+        await expect(
+          order([
+            { productId: plain, quantity: 1 },
+            { productId: id(), quantity: 1 },
+          ]),
+        ).rejects.toThrow(message);
+        expect(await orders.list()).toEqual([]);
+      },
+    );
 
-    it('giá đổi sau khi đặt không ảnh hưởng đơn cũ; xoá sản phẩm không mất đơn', () => {
-      const created = order([{ productId: plain, quantity: 1 }]);
-      products.update(plain, { price: 9_000_000, name: 'Tên mới' });
-      products.remove(plain);
+    it('giá đổi sau khi đặt không ảnh hưởng đơn cũ; xoá sản phẩm không mất đơn', async () => {
+      const created = await order([{ productId: plain, quantity: 1 }]);
+      await products.update(plain, { price: 9_000_000, name: 'Tên mới' });
+      await products.remove(plain);
 
-      const again = orders.findOneOrFail(created.id);
+      const again = await orders.findOneOrFail(created.id);
       expect(again.total).toBe(3_000_000);
       expect(again.items[0]).toMatchObject({
         productId: null,
@@ -155,11 +162,11 @@ describe('OrdersService', () => {
   });
 
   describe('xử lý đơn', () => {
-    it('đi đúng luồng và ghi lịch sử kèm người thực hiện', () => {
-      const { id } = order([{ productId: plain, quantity: 1 }]);
-      orders.updateStatus(id, { status: 'confirmed', actor: 'Admin' });
-      orders.updateStatus(id, { status: 'shipping', actor: 'Admin' });
-      const done = orders.updateStatus(id, {
+    it('đi đúng luồng và ghi lịch sử kèm người thực hiện', async () => {
+      const { id } = await order([{ productId: plain, quantity: 1 }]);
+      await orders.updateStatus(id, { status: 'confirmed', actor: 'Admin' });
+      await orders.updateStatus(id, { status: 'shipping', actor: 'Admin' });
+      const done = await orders.updateStatus(id, {
         status: 'completed',
         actor: 'Admin',
       });
@@ -174,44 +181,51 @@ describe('OrdersService', () => {
       expect(done.events[1].actor).toBe('Admin');
     });
 
-    it('chặn bước nhảy sai và mở lại đơn đã xong', () => {
-      const { id } = order([{ productId: plain, quantity: 1 }]);
-      expect(() => orders.updateStatus(id, { status: 'shipping' })).toThrow(
-        'Không chuyển được',
-      );
-      orders.updateStatus(id, { status: 'confirmed' });
-      orders.updateStatus(id, { status: 'completed' });
-      expect(() => orders.updateStatus(id, { status: 'pending' })).toThrow();
-      expect(() =>
+    it('chặn bước nhảy sai và mở lại đơn đã xong', async () => {
+      const { id } = await order([{ productId: plain, quantity: 1 }]);
+      await expect(
+        orders.updateStatus(id, { status: 'shipping' }),
+      ).rejects.toThrow('Không chuyển được');
+      await orders.updateStatus(id, { status: 'confirmed' });
+      await orders.updateStatus(id, { status: 'completed' });
+      await expect(
+        orders.updateStatus(id, { status: 'pending' }),
+      ).rejects.toThrow();
+      await expect(
         orders.updateStatus(id, { status: 'cancelled', note: 'x' }),
-      ).toThrow();
+      ).rejects.toThrow();
     });
 
-    it('huỷ đơn bắt buộc ghi lý do', () => {
-      const { id } = order([{ productId: plain, quantity: 1 }]);
-      expect(() => orders.updateStatus(id, { status: 'cancelled' })).toThrow(
-        'lý do',
-      );
+    it('huỷ đơn bắt buộc ghi lý do', async () => {
+      const { id } = await order([{ productId: plain, quantity: 1 }]);
+      await expect(
+        orders.updateStatus(id, { status: 'cancelled' }),
+      ).rejects.toThrow('lý do');
       expect(
-        orders.updateStatus(id, { status: 'cancelled', note: 'Khách đổi ý' })
-          .status,
+        (
+          await orders.updateStatus(id, {
+            status: 'cancelled',
+            note: 'Khách đổi ý',
+          })
+        ).status,
       ).toBe('cancelled');
     });
 
-    it('thanh toán: thu → hoàn tiền, không hoàn khi chưa thu', () => {
-      const { id } = order([{ productId: plain, quantity: 1 }]);
-      expect(() =>
+    it('thanh toán: thu → hoàn tiền, không hoàn khi chưa thu', async () => {
+      const { id } = await order([{ productId: plain, quantity: 1 }]);
+      await expect(
         orders.updatePayment(id, { paymentStatus: 'refunded' }),
-      ).toThrow();
-      orders.updatePayment(id, { paymentStatus: 'paid' });
+      ).rejects.toThrow();
+      await orders.updatePayment(id, { paymentStatus: 'paid' });
       expect(
-        orders.updatePayment(id, { paymentStatus: 'refunded' }).paymentStatus,
+        (await orders.updatePayment(id, { paymentStatus: 'refunded' }))
+          .paymentStatus,
       ).toBe('refunded');
     });
 
-    it('ghi chú nội bộ lưu kèm một dòng lịch sử', () => {
-      const { id } = order([{ productId: plain, quantity: 1 }]);
-      const updated = orders.updateAdminNote(id, {
+    it('ghi chú nội bộ lưu kèm một dòng lịch sử', async () => {
+      const { id } = await order([{ productId: plain, quantity: 1 }]);
+      const updated = await orders.updateAdminNote(id, {
         adminNote: 'Gọi lại sau 3h',
         actor: 'Admin',
       });
@@ -223,27 +237,29 @@ describe('OrdersService', () => {
     });
   });
 
-  it('lọc theo tìm kiếm, trạng thái, tài khoản; thống kê doanh thu', () => {
-    const a = order([{ productId: plain, quantity: 1 }], {
+  it('lọc theo tìm kiếm, trạng thái, tài khoản; thống kê doanh thu', async () => {
+    const a = await order([{ productId: plain, quantity: 1 }], {
       userEmail: 'khach@vd.vn',
     });
-    order([{ productId: sale, quantity: 1 }], { customerName: 'Trần Thị Bé' });
-    orders.updateStatus(a.id, { status: 'confirmed' });
-    orders.updateStatus(a.id, { status: 'completed' });
+    await order([{ productId: sale, quantity: 1 }], {
+      customerName: 'Trần Thị Bé',
+    });
+    await orders.updateStatus(a.id, { status: 'confirmed' });
+    await orders.updateStatus(a.id, { status: 'completed' });
 
     expect(
-      orders.list({ search: 'tran thi' }).map((o) => o.customerName),
+      (await orders.list({ search: 'tran thi' })).map((o) => o.customerName),
     ).toEqual(['Trần Thị Bé']);
-    expect(orders.list({ search: '0905123' })).toHaveLength(2);
-    expect(orders.list({ search: '0905 123' })).toHaveLength(2);
-    expect(orders.list({ status: 'completed' }).map((o) => o.id)).toEqual([
-      a.id,
-    ]);
-    expect(orders.list({ userEmail: 'KHACH@vd.vn' }).map((o) => o.id)).toEqual([
-      a.id,
-    ]);
+    expect(await orders.list({ search: '0905123' })).toHaveLength(2);
+    expect(await orders.list({ search: '0905 123' })).toHaveLength(2);
+    expect(
+      (await orders.list({ status: 'completed' })).map((o) => o.id),
+    ).toEqual([a.id]);
+    expect(
+      (await orders.list({ userEmail: 'KHACH@vd.vn' })).map((o) => o.id),
+    ).toEqual([a.id]);
 
-    expect(orders.stats()).toMatchObject({
+    expect(await orders.stats()).toMatchObject({
       total: 2,
       revenue: 3_000_000,
       today: 2,

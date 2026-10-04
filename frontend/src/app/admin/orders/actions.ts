@@ -2,7 +2,8 @@
 
 import { refresh } from "next/cache";
 
-import { requireAdmin } from "@/lib/admin";
+import type { Permission } from "@/lib/access";
+import { requirePermission } from "@/lib/admin";
 import { BackendError } from "@/lib/backend";
 import {
   ORDER_STATUSES,
@@ -21,8 +22,8 @@ function text(formData: FormData, field: string): string {
 }
 
 /** Người thực hiện ghi vào lịch sử đơn: tên kèm email cho dễ truy. */
-async function actor(): Promise<string> {
-  const admin = await requireAdmin();
+async function actor(permission: Permission): Promise<string> {
+  const admin = await requirePermission(permission);
   return admin.name ? `${admin.name} <${admin.email}>` : admin.email;
 }
 
@@ -42,7 +43,7 @@ export async function updateOrderStatusAction(
   _prev: OrderActionState,
   formData: FormData,
 ): Promise<OrderActionState> {
-  const by = await actor();
+  const by = await actor("ORDERS.WRITE");
   const raw = text(formData, "status");
   if (!(ORDER_STATUSES as readonly string[]).includes(raw)) {
     return { error: "Trạng thái không hợp lệ." };
@@ -62,7 +63,7 @@ export async function updateOrderPaymentAction(
   _prev: OrderActionState,
   formData: FormData,
 ): Promise<OrderActionState> {
-  const by = await actor();
+  const by = await actor("ORDERS.PAYMENT");
   const raw = text(formData, "paymentStatus");
   if (!(PAYMENT_STATUSES as readonly string[]).includes(raw)) {
     return { error: "Trạng thái thanh toán không hợp lệ." };
@@ -81,7 +82,7 @@ export async function updateOrderNoteAction(
   _prev: OrderActionState,
   formData: FormData,
 ): Promise<OrderActionState> {
-  const by = await actor();
+  const by = await actor("ORDERS.WRITE");
   return run(() =>
     updateOrderNote(text(formData, "id"), {
       adminNote: text(formData, "adminNote") || null,

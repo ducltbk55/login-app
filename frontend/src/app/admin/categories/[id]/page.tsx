@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { CategoryForm } from "@/components/admin/category-form";
 import { ListIcon } from "@/components/admin/icons";
 import { BackLink, PageHeader } from "@/components/admin/page-header";
+import { can } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { findCategory, listAllCategories } from "@/lib/categories";
 import { formatDateTime } from "@/lib/format";
 import { BUTTON, CODE_CHIP } from "@/lib/styles";
@@ -13,9 +15,11 @@ export default async function EditCategoryPage(
   props: PageProps<"/admin/categories/[id]">,
 ) {
   const { id } = await props.params;
-  const category = await findCategory(id);
+  const [category, user] = await Promise.all([findCategory(id), currentUser()]);
 
   if (!category) notFound();
+  // Layout đã đòi CATEGORIES.READ; thiếu WRITE thì vẫn xem được nhưng chỉ đọc.
+  const canWrite = can(user!, "CATEGORIES.WRITE");
 
   // Loại chính nó và các danh mục đang lấy nó làm nhóm, tránh tạo vòng.
   const all = await listAllCategories();
@@ -28,7 +32,7 @@ export default async function EditCategoryPage(
       <BackLink href="/admin/categories">Danh sách danh mục</BackLink>
 
       <PageHeader
-        title={`Sửa: ${category.name}`}
+        title={canWrite ? `Sửa: ${category.name}` : category.name}
         description={
           <span className="inline-flex flex-wrap items-center gap-2">
             <code className={CODE_CHIP}>{category.code}</code>
@@ -57,6 +61,7 @@ export default async function EditCategoryPage(
         submitLabel="Lưu thay đổi"
         codeHint="Chữ, số, -, _ và dấu chấm. Duy nhất trong toàn hệ thống."
         groupCategoryOptions={groupCategoryOptions}
+        readOnly={!canWrite}
       />
     </div>
   );

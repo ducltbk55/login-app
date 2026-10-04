@@ -9,6 +9,8 @@ import {
 import { DeleteButton } from "@/components/admin/delete-button";
 import { ExternalIcon, PaperclipIcon } from "@/components/admin/icons";
 import { BackLink, PageHeader } from "@/components/admin/page-header";
+import { can } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { findContact, formatBytes } from "@/lib/contacts";
 import { formatDateTime } from "@/lib/format";
 import { BUTTON, CARD, CODE_CHIP } from "@/lib/styles";
@@ -35,7 +37,13 @@ function Section({
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="grid gap-1 sm:grid-cols-[9rem_1fr] sm:gap-4">
       <dt className="text-sm text-admin-muted">{label}</dt>
@@ -48,9 +56,11 @@ export default async function ContactDetailPage(
   props: PageProps<"/admin/contacts/[id]">,
 ) {
   const { id } = await props.params;
-  const contact = await findContact(id);
+  const [contact, user] = await Promise.all([findContact(id), currentUser()]);
 
   if (!contact) notFound();
+  // Layout chỉ đòi CONTACTS.READ — thiếu WRITE thì chỉ xem, không xử lý.
+  const canWrite = can(user!, "CONTACTS.WRITE");
 
   const attachmentHref = `/admin/contacts/${contact.id}/attachment`;
 
@@ -168,46 +178,56 @@ export default async function ContactDetailPage(
                 )}
               </Row>
               <Row label="Chủ đề">
-                {contact.subject ?? (
-                  <span className="text-admin-muted">—</span>
-                )}
+                {contact.subject ?? <span className="text-admin-muted">—</span>}
               </Row>
             </dl>
           </Section>
 
-          <Section title="Trạng thái">
-            <p className="text-sm text-admin-muted">
-              Đang là{" "}
-              <span className="font-medium text-admin-text">
-                <ContactStatusBadge status={contact.status} />
-              </span>
-              . Chuyển sang:
-            </p>
-            <ContactStatusButtons
-              id={contact.id}
-              current={contact.status}
-              action={setContactStatusAction}
-            />
-          </Section>
+          {canWrite && (
+            <Section title="Trạng thái">
+              <p className="text-sm text-admin-muted">
+                Đang là{" "}
+                <span className="font-medium text-admin-text">
+                  <ContactStatusBadge status={contact.status} />
+                </span>
+                . Chuyển sang:
+              </p>
+              <ContactStatusButtons
+                id={contact.id}
+                current={contact.status}
+                action={setContactStatusAction}
+              />
+            </Section>
+          )}
 
-          <Section title="Ghi chú">
-            <ContactNoteForm
-              defaultNote={contact.note}
-              action={saveContactNoteAction.bind(null, contact.id)}
-            />
-          </Section>
+          {canWrite ? (
+            <Section title="Ghi chú">
+              <ContactNoteForm
+                defaultNote={contact.note}
+                action={saveContactNoteAction.bind(null, contact.id)}
+              />
+            </Section>
+          ) : (
+            contact.note && (
+              <Section title="Ghi chú">
+                <p className="text-sm whitespace-pre-line">{contact.note}</p>
+              </Section>
+            )
+          )}
 
-          <Section title="Xoá">
-            <p className="text-sm text-admin-muted">
-              Xoá liên hệ sẽ xoá luôn tệp đính kèm trên máy chủ và không hoàn
-              tác được.
-            </p>
-            <DeleteButton
-              id={contact.id}
-              action={deleteContactAndGoBackAction}
-              confirmText={`Xoá liên hệ của "${contact.name}"? Tệp đính kèm cũng bị xoá theo.`}
-            />
-          </Section>
+          {canWrite && (
+            <Section title="Xoá">
+              <p className="text-sm text-admin-muted">
+                Xoá liên hệ sẽ xoá luôn tệp đính kèm trên máy chủ và không hoàn
+                tác được.
+              </p>
+              <DeleteButton
+                id={contact.id}
+                action={deleteContactAndGoBackAction}
+                confirmText={`Xoá liên hệ của "${contact.name}"? Tệp đính kèm cũng bị xoá theo.`}
+              />
+            </Section>
+          )}
         </div>
       </div>
     </div>

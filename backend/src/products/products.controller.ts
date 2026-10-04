@@ -43,8 +43,8 @@ export class ProductsController {
   ) {}
 
   @Get()
-  list(@Query() query: ListProductsDto): Paginated<Product> {
-    return paginate(this.products.list(query), query);
+  async list(@Query() query: ListProductsDto): Promise<Paginated<Product>> {
+    return paginate(await this.products.list(query), query);
   }
 
   /**
@@ -52,16 +52,18 @@ export class ProductsController {
    * biết mã DM_LINH_VUC_SP rồi gọi hai vòng.
    */
   @Get('categories')
-  listCategories(@Query('live') live?: string): {
-    id: number;
-    code: string;
-    name: string;
-    productCount: number;
-  }[] {
-    const counts = this.products.countsByCategory(
+  async listCategories(@Query('live') live?: string): Promise<
+    {
+      id: number;
+      code: string;
+      name: string;
+      productCount: number;
+    }[]
+  > {
+    const counts = await this.products.countsByCategory(
       live === 'true' || live === '1',
     );
-    return this.categories.list().map((detail) => ({
+    return (await this.categories.list()).map((detail) => ({
       id: detail.id,
       code: detail.code,
       name: detail.name,
@@ -71,8 +73,8 @@ export class ProductsController {
 
   /** Đặt trước `:id` — Nest khớp route theo thứ tự khai báo. */
   @Get('slug/:slug')
-  findBySlug(@Param('slug') slug: string): Product {
-    const product = this.products.findBySlug(slug);
+  async findBySlug(@Param('slug') slug: string): Promise<Product> {
+    const product = await this.products.findBySlug(slug);
     if (!product) {
       throw new NotFoundException(`Không tìm thấy sản phẩm "${slug}"`);
     }
@@ -97,26 +99,26 @@ export class ProductsController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number): Product {
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Product> {
     return this.products.findOneOrFail(id);
   }
 
   @Post()
-  create(@Body() dto: CreateProductDto): Product {
+  async create(@Body() dto: CreateProductDto): Promise<Product> {
     return this.products.create(dto);
   }
 
   @Patch(':id')
-  update(
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateProductDto,
-  ): Product {
+  ): Promise<Product> {
     return this.products.update(id, dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id', ParseIntPipe) id: number): void {
-    this.products.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    await this.products.remove(id);
   }
 }

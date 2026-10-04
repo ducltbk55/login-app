@@ -18,6 +18,7 @@ import {
   PERMISSION_CATEGORY_NAME,
   PERMISSION_SEEDS,
   permissionGroupOf,
+  type FunctionDef,
   type PermissionDef,
 } from '../common/permissions';
 
@@ -30,14 +31,16 @@ import {
 @Injectable()
 export class PermissionCatalogService implements OnModuleInit {
   private readonly logger = new Logger(PermissionCatalogService.name);
+  /** Lần seed đang chạy (nếu có), để các lời gọi đồng thời chờ chung. */
+  private seeding?: Promise<void>;
 
   constructor(
     private readonly categories: CategoriesService,
     private readonly details: CategoryDetailsService,
   ) {}
 
-  onModuleInit(): void {
-    this.ensureSeeded();
+  async onModuleInit(): Promise<void> {
+    await this.ensureSeeded();
   }
 
   /**
@@ -48,33 +51,46 @@ export class PermissionCatalogService implements OnModuleInit {
    *
    * Public và idempotent vì Nest không đảm bảo thứ tự `onModuleInit` giữa các
    * provider: service nào cần danh mục quyền thì gọi trước cho chắc.
+   *
+   * Nest chạy `onModuleInit` của các provider song song, nên các lời gọi đồng
+   * thời dùng chung một lần seed thay vì cùng INSERT rồi vướng UNIQUE.
    */
-  ensureSeeded(): void {
-    const functions = this.ensureFunctionCategory();
-    const permissions = this.ensurePermissionCategory(functions.id);
-    this.ensurePermissionDetails(permissions, functions.id);
+  ensureSeeded(): Promise<void> {
+    this.seeding ??= this.seed().finally(() => {
+      this.seeding = undefined;
+    });
+    return this.seeding;
+  }
+
+  private async seed(): Promise<void> {
+    const functions = await this.ensureFunctionCategory();
+    const permissions = await this.ensurePermissionCategory(functions.id);
+    await this.ensurePermissionDetails(permissions, functions.id);
   }
 
   /** Danh mục chức năng + các chi tiết của nó (Người dùng, Danh mục...). */
-  private ensureFunctionCategory(): Category {
+  private async ensureFunctionCategory(): Promise<Category> {
     const category =
-      this.findByCode(FUNCTION_CATEGORY_CODE) ??
-      this.createCategory(
+      (await this.findByCode(FUNCTION_CATEGORY_CODE)) ??
+      (await this.createCategory(
         FUNCTION_CATEGORY_CODE,
         FUNCTION_CATEGORY_NAME,
         FUNCTION_CATEGORY_DESCRIPTION,
-      );
+      ));
 
     const existing = new Map(
-      this.details.list(category.id).map((detail) => [detail.code, detail]),
+      (await this.details.list(category.id)).map((detail) => [
+        detail.code,
+        detail,
+      ]),
     );
 
-    FUNCTION_SEEDS.forEach((seed, index) => {
+    for (const [index, seed] of FUNCTION_SEEDS.entries()) {
       const order = index + 1; // thứ tự hiển thị đánh số từ 1
       const current = existing.get(seed.code);
 
       if (!current) {
-        this.details.create(category.id, {
+        await this.details.create(category.id, {
           code: seed.code,
           name: seed.label,
           order,
@@ -82,20 +98,22 @@ export class PermissionCatalogService implements OnModuleInit {
         this.logger.log(
           `Thêm chức năng "${seed.label}" vào danh mục chức năng`,
         );
-        return;
+        continue;
       }
 
       if (current.order !== order) {
-        this.details.update(category.id, current.id, { order });
+        await this.details.update(category.id, current.id, { order });
       }
-    });
+    }
 
     return category;
   }
 
   /** Danh mục quyền, luôn trỏ nhóm về danh mục chức năng. */
-  private ensurePermissionCategory(functionCategoryId: number): Category {
-    const found = this.findByCode(PERMISSION_CATEGORY_CODE);
+  private async ensurePermissionCategory(
+    functionCategoryId: number,
+  ): Promise<Category> {
+    const found = await this.findByCode(PERMISSION_CATEGORY_CODE);
 
     if (!found) {
       return this.createCategory(
@@ -117,54 +135,58 @@ export class PermissionCatalogService implements OnModuleInit {
   }
 
   /** Mỗi quyền là một chi tiết, thuộc về chi tiết chức năng tương ứng. */
-  private ensurePermissionDetails(
+  private async ensurePermissionDetails(
     permissionCategory: Category,
     functionCategoryId: number,
-  ): void {
+  ): Promise<void> {
     const functionIdByCode = new Map(
-      this.details
-        .list(functionCategoryId)
-        .map((detail) => [detail.code, detail.id]),
+      (await this.details.list(functionCategoryId)).map((detail) => [
+        detail.code,
+        detail.id,
+      ]),
     );
     const existing = new Map(
-      this.details
-        .list(permissionCategory.id)
-        .map((detail) => [detail.code, detail]),
+      (await this.details.list(permissionCategory.id)).map((detail) => [
+        detail.code,
+        detail,
+      ]),
     );
 
     let added = 0;
     let linked = 0;
 
-    PERMISSION_SEEDS.forEach((seed, index) => {
+    for (const [index, seed] of PERMISSION_SEEDS.entries()) {
       const groupDetailId = functionIdByCode.get(seed.functionCode);
-      if (groupDetailId === undefined) return; // admin đã xoá chức năng này
+      if (groupDetailId === undefined) continue; // admin đã xoá chức năng này
 
       const order = index + 1; // thứ tự hiển thị đánh số từ 1
       const current = existing.get(seed.code);
 
       if (!current) {
-        this.details.create(permissionCategory.id, {
+        await this.details.create(permissionCategory.id, {
           code: seed.code,
           name: seed.label,
           order,
           groupDetailId,
         });
         added += 1;
-        return;
+        continue;
       }
 
       // Chi tiết có sẵn nhưng chưa có nhóm (dữ liệu cũ) thì gán lại.
       if (current.groupDetailId === null) {
-        this.details.update(permissionCategory.id, current.id, {
+        await this.details.update(permissionCategory.id, current.id, {
           groupDetailId,
         });
         linked += 1;
       }
 
       if (current.order !== order) {
-        this.details.update(permissionCategory.id, current.id, { order });
+        await this.details.update(permissionCategory.id, current.id, {
+          order,
+        });
       }
-    });
+    }
 
     if (added > 0) {
       this.logger.log(`Đã thêm ${added} quyền mặc định vào danh mục quyền`);
@@ -174,16 +196,16 @@ export class PermissionCatalogService implements OnModuleInit {
     }
   }
 
-  private findByCode(code: string): Category | null {
-    return this.categories.list().find((c) => c.code === code) ?? null;
+  private async findByCode(code: string): Promise<Category | null> {
+    return (await this.categories.list()).find((c) => c.code === code) ?? null;
   }
 
-  private createCategory(
+  private async createCategory(
     code: string,
     name: string,
     descriptions: string,
     groupCategoryId?: number,
-  ): Category {
+  ): Promise<Category> {
     this.logger.log(`Tạo danh mục "${name}"`);
     return this.categories.create({
       code,
@@ -194,23 +216,41 @@ export class PermissionCatalogService implements OnModuleInit {
   }
 
   /** Toàn bộ quyền đang bật, đã sắp theo thứ tự hiển thị của danh mục. */
-  list(): PermissionDef[] {
-    const category = this.findByCode(PERMISSION_CATEGORY_CODE);
+  async list(): Promise<PermissionDef[]> {
+    const category = await this.findByCode(PERMISSION_CATEGORY_CODE);
     if (!category) return [];
 
-    return this.details
-      .list(category.id, { status: 'active' })
-      .map((detail) => ({
+    return (await this.details.list(category.id, { status: 'active' })).map(
+      (detail) => ({
         key: detail.code,
         // Tên chức năng lấy từ chi tiết nhóm; chưa phân nhóm thì tạm dùng mã.
         group: detail.group?.name ?? permissionGroupOf(detail.code),
         label: detail.name,
         description: detail.descriptions,
-      }));
+      }),
+    );
   }
 
-  keys(): string[] {
-    return this.list().map((permission) => permission.key);
+  /**
+   * Chức năng đang bật (chi tiết của danh mục chức năng), theo thứ tự hiển
+   * thị. Frontend dựng menu quản trị từ đây: đổi tên/thứ tự/tắt một chức
+   * năng trong Danh mục là menu đổi theo.
+   */
+  async functions(): Promise<FunctionDef[]> {
+    const category = await this.findByCode(FUNCTION_CATEGORY_CODE);
+    if (!category) return [];
+
+    return (await this.details.list(category.id, { status: 'active' })).map(
+      (detail) => ({
+        code: detail.code,
+        label: detail.name,
+        order: detail.order,
+      }),
+    );
+  }
+
+  async keys(): Promise<string[]> {
+    return (await this.list()).map((permission) => permission.key);
   }
 
   /**
@@ -218,8 +258,8 @@ export class PermissionCatalogService implements OnModuleInit {
    * việc này do `@IsIn` trong DTO lo, nhưng danh sách giờ nằm trong DB nên
    * phải kiểm tra lúc chạy.
    */
-  assertAllExist(permissions: string[]): void {
-    const known = new Set(this.keys());
+  async assertAllExist(permissions: string[]): Promise<void> {
+    const known = new Set(await this.keys());
     const unknown = permissions.filter((p) => !known.has(p));
 
     if (unknown.length > 0) {

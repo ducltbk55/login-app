@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 
 import { matchesSearch } from '../common/search';
-import { SqliteService } from '../database/sqlite.service';
+import { DatabaseService } from '../database/database.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ListOrdersDto } from './dto/list-orders.dto';
 import {
@@ -28,7 +28,7 @@ import {
   type PaymentStatus,
 } from './order.entity';
 
-type Id = number | bigint;
+type Id = number;
 
 type OrderRow = {
   id: Id;
@@ -119,7 +119,7 @@ function toEvent(row: EventRow): OrderEvent {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly sqlite: SqliteService) {}
+  constructor(private readonly db: DatabaseService) {}
 
   private toOrder(row: OrderRow, items: OrderItem[]): Order {
     return {
@@ -146,17 +146,16 @@ export class OrdersService {
   }
 
   /** Dòng hàng của nhiều đơn trong một truy vấn, gom theo đơn. */
-  private itemsOf(orderIds: number[]): Map<number, OrderItem[]> {
+  private async itemsOf(orderIds: number[]): Promise<Map<number, OrderItem[]>> {
     const byOrder = new Map<number, OrderItem[]>();
     if (orderIds.length === 0) return byOrder;
 
-    const rows = this.sqlite.db
-      .prepare(
-        `SELECT * FROM order_items
-          WHERE orderId IN (${orderIds.map(() => '?').join(', ')})
-          ORDER BY id`,
-      )
-      .all(...orderIds) as ItemRow[];
+    const rows = await this.db.all<ItemRow>(
+      `SELECT * FROM order_items
+        WHERE orderId IN (${orderIds.map(() => '?').join(', ')})
+        ORDER BY id`,
+      orderIds,
+    );
 
     for (const row of rows) {
       const orderId = Number(row.orderId);
@@ -167,7 +166,7 @@ export class OrdersService {
     return byOrder;
   }
 
-  list(query: ListOrdersDto = {}): Order[] {
+  async list(query: ListOrdersDto = {}): Promise<Order[]> {
     const where: string[] = [];
     const params: string[] = [];
 
@@ -180,19 +179,19 @@ export class OrdersService {
       params.push(query.paymentStatus);
     }
     if (query.userEmail) {
-      where.push('userEmail = ? COLLATE NOCASE');
+      // Collation mặc định utf8mb4_unicode_ci đã không phân biệt hoa thường.
+      where.push('userEmail = ?');
       params.push(query.userEmail);
     }
 
-    let rows = this.sqlite.db
-      .prepare(
-        `SELECT * FROM orders
-         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-         ORDER BY createdAt DESC, id DESC`,
-      )
-      .all(...params) as OrderRow[];
+    let rows = await this.db.all<OrderRow>(
+      `SELECT * FROM orders
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       ORDER BY createdAt DESC, id DESC`,
+      params,
+    );
 
-    // Lọc chữ trong JS vì SQLite dựng sẵn không bỏ dấu được — xem common/search.ts
+    // Lọc chữ trong JS để khớp cả khi gõ không dấu — xem common/search.ts
     if (query.search) {
       const search = query.search;
       rows = rows.filter((row) =>
@@ -208,45 +207,48 @@ export class OrdersService {
       );
     }
 
-    const items = this.itemsOf(rows.map((row) => Number(row.id)));
+    const items = await this.itemsOf(rows.map((row) => Number(row.id)));
     return rows.map((row) =>
       this.toOrder(row, items.get(Number(row.id)) ?? []),
     );
   }
 
-  findOne(id: number): OrderDetail | null {
-    const row = this.sqlite.db
-      .prepare('SELECT * FROM orders WHERE id = ?')
-      .get(id) as OrderRow | undefined;
+  async findOne(id: number): Promise<OrderDetail | null> {
+    const row = await this.db.get<OrderRow>(
+      'SELECT * FROM orders WHERE id = ?',
+      [id],
+    );
     if (!row) return null;
 
     const events = (
-      this.sqlite.db
-        .prepare(
-          'SELECT * FROM order_events WHERE orderId = ? ORDER BY createdAt, id',
-        )
-        .all(id) as EventRow[]
+      await this.db.all<EventRow>(
+        'SELECT * FROM order_events WHERE orderId = ? ORDER BY createdAt, id',
+        [id],
+      )
     ).map(toEvent);
 
+    const items = await this.itemsOf([id]);
     return {
-      ...this.toOrder(row, this.itemsOf([id]).get(id) ?? []),
+      ...this.toOrder(row, items.get(id) ?? []),
       events,
     };
   }
 
-  findOneOrFail(id: number): OrderDetail {
-    const order = this.findOne(id);
+  async findOneOrFail(id: number): Promise<OrderDetail> {
+    const order = await this.findOne(id);
     if (!order) throw new NotFoundException(`Không có đơn hàng #${id}`);
     return order;
   }
 
-  stats(): OrderStats {
-    const rows = this.sqlite.db
-      .prepare(
-        `SELECT status, COUNT(*) AS n, SUM(total) AS amount
-           FROM orders GROUP BY status`,
-      )
-      .all() as { status: string; n: Id; amount: Id | null }[];
+  async stats(): Promise<OrderStats> {
+    const rows = await this.db.all<{
+      status: string;
+      n: Id;
+      amount: Id | null;
+    }>(
+      `SELECT status, COUNT(*) AS n, SUM(total) AS amount
+         FROM orders GROUP BY status`,
+    );
 
     const byStatus = Object.fromEntries(
       ORDER_STATUSES.map((status) => [status, 0]),
@@ -259,15 +261,16 @@ export class OrdersService {
 
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-    const today = this.sqlite.db
-      .prepare('SELECT COUNT(*) AS n FROM orders WHERE createdAt >= ?')
-      .get(startOfDay.toISOString()) as { n: Id };
+    const today = await this.db.get<{ n: Id }>(
+      'SELECT COUNT(*) AS n FROM orders WHERE createdAt >= ?',
+      [startOfDay.toISOString()],
+    );
 
     return {
       total: Object.values(byStatus).reduce((sum, n) => sum + n, 0),
       byStatus,
       revenue,
-      today: Number(today.n),
+      today: Number(today?.n ?? 0),
     };
   }
 
@@ -276,8 +279,8 @@ export class OrdersService {
    * transaction — số tiền trên đơn là số server tính, không phải số trình
    * duyệt gửi lên.
    */
-  create(dto: CreateOrderDto): OrderDetail {
-    return this.sqlite.transaction(() => {
+  async create(dto: CreateOrderDto): Promise<OrderDetail> {
+    return this.db.transaction(async () => {
       // Cùng một sản phẩm xuất hiện hai lần thì gộp số lượng.
       const quantities = new Map<number, number>();
       for (const line of dto.items) {
@@ -290,12 +293,11 @@ export class OrdersService {
       const ids = [...quantities.keys()];
       const products = new Map(
         (
-          this.sqlite.db
-            .prepare(
-              `SELECT id, slug, name, sku, image, price, salePrice, status, inStock
-                 FROM products WHERE id IN (${ids.map(() => '?').join(', ')})`,
-            )
-            .all(...ids) as ProductRow[]
+          await this.db.all<ProductRow>(
+            `SELECT id, slug, name, sku, image, price, salePrice, status, inStock
+               FROM products WHERE id IN (${ids.map(() => '?').join(', ')})`,
+            ids,
+          )
         ).map((row) => [Number(row.id), row]),
       );
 
@@ -329,16 +331,14 @@ export class OrdersService {
       const total = lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
       const now = new Date().toISOString();
 
-      const result = this.sqlite.db
-        .prepare(
-          `INSERT INTO orders
-             (code, customerName, customerPhone, customerEmail, address, note,
-              userEmail, paymentMethod, paymentStatus, status,
-              subtotal, discount, total, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', 'pending', ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          this.nextCode(),
+      const result = await this.db.run(
+        `INSERT INTO orders
+           (code, customerName, customerPhone, customerEmail, address, note,
+            userEmail, paymentMethod, paymentStatus, status,
+            subtotal, discount, total, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', 'pending', ?, ?, ?, ?, ?)`,
+        [
+          await this.nextCode(),
           dto.customerName,
           dto.customerPhone,
           dto.customerEmail ?? null,
@@ -351,30 +351,31 @@ export class OrdersService {
           total,
           now,
           now,
-        );
-      const orderId = Number(result.lastInsertRowid);
-
-      const insertItem = this.sqlite.db.prepare(
-        `INSERT INTO order_items
-           (orderId, productId, productName, productSlug, sku, image,
-            listPrice, unitPrice, quantity)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ],
       );
+      const orderId = result.lastInsertId;
+
       for (const line of lines) {
-        insertItem.run(
-          orderId,
-          Number(line.product.id),
-          line.product.name,
-          line.product.slug,
-          line.product.sku,
-          line.product.image,
-          line.listPrice,
-          line.unitPrice,
-          line.quantity,
+        await this.db.run(
+          `INSERT INTO order_items
+             (orderId, productId, productName, productSlug, sku, image,
+              listPrice, unitPrice, quantity)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            orderId,
+            Number(line.product.id),
+            line.product.name,
+            line.product.slug,
+            line.product.sku,
+            line.product.image,
+            line.listPrice,
+            line.unitPrice,
+            line.quantity,
+          ],
         );
       }
 
-      this.addEvent(
+      await this.addEvent(
         orderId,
         'created',
         null,
@@ -386,9 +387,12 @@ export class OrdersService {
     });
   }
 
-  updateStatus(id: number, dto: UpdateOrderStatusDto): OrderDetail {
-    return this.sqlite.transaction(() => {
-      const order = this.findOneOrFail(id);
+  async updateStatus(
+    id: number,
+    dto: UpdateOrderStatusDto,
+  ): Promise<OrderDetail> {
+    return this.db.transaction(async () => {
+      const order = await this.findOneOrFail(id);
       if (order.status === dto.status) return order;
 
       if (!ORDER_TRANSITIONS[order.status].includes(dto.status)) {
@@ -400,10 +404,11 @@ export class OrdersService {
         throw new BadRequestException('Huỷ đơn cần ghi rõ lý do');
       }
 
-      this.sqlite.db
-        .prepare('UPDATE orders SET status = ?, updatedAt = ? WHERE id = ?')
-        .run(dto.status, new Date().toISOString(), id);
-      this.addEvent(
+      await this.db.run(
+        'UPDATE orders SET status = ?, updatedAt = ? WHERE id = ?',
+        [dto.status, new Date().toISOString(), id],
+      );
+      await this.addEvent(
         id,
         'status',
         order.status,
@@ -416,9 +421,12 @@ export class OrdersService {
     });
   }
 
-  updatePayment(id: number, dto: UpdatePaymentStatusDto): OrderDetail {
-    return this.sqlite.transaction(() => {
-      const order = this.findOneOrFail(id);
+  async updatePayment(
+    id: number,
+    dto: UpdatePaymentStatusDto,
+  ): Promise<OrderDetail> {
+    return this.db.transaction(async () => {
+      const order = await this.findOneOrFail(id);
       if (order.paymentStatus === dto.paymentStatus) return order;
 
       if (
@@ -429,12 +437,11 @@ export class OrdersService {
         );
       }
 
-      this.sqlite.db
-        .prepare(
-          'UPDATE orders SET paymentStatus = ?, updatedAt = ? WHERE id = ?',
-        )
-        .run(dto.paymentStatus, new Date().toISOString(), id);
-      this.addEvent(
+      await this.db.run(
+        'UPDATE orders SET paymentStatus = ?, updatedAt = ? WHERE id = ?',
+        [dto.paymentStatus, new Date().toISOString(), id],
+      );
+      await this.addEvent(
         id,
         'payment',
         order.paymentStatus,
@@ -447,16 +454,20 @@ export class OrdersService {
     });
   }
 
-  updateAdminNote(id: number, dto: UpdateAdminNoteDto): OrderDetail {
-    return this.sqlite.transaction(() => {
-      const order = this.findOneOrFail(id);
+  async updateAdminNote(
+    id: number,
+    dto: UpdateAdminNoteDto,
+  ): Promise<OrderDetail> {
+    return this.db.transaction(async () => {
+      const order = await this.findOneOrFail(id);
       const adminNote = dto.adminNote ?? null;
       if (order.adminNote === adminNote) return order;
 
-      this.sqlite.db
-        .prepare('UPDATE orders SET adminNote = ?, updatedAt = ? WHERE id = ?')
-        .run(adminNote, new Date().toISOString(), id);
-      this.addEvent(
+      await this.db.run(
+        'UPDATE orders SET adminNote = ?, updatedAt = ? WHERE id = ?',
+        [adminNote, new Date().toISOString(), id],
+      );
+      await this.addEvent(
         id,
         'note',
         null,
@@ -469,21 +480,19 @@ export class OrdersService {
     });
   }
 
-  private addEvent(
+  private async addEvent(
     orderId: number,
     type: OrderEventType,
     fromValue: string | null,
     toValue: string | null,
     note: string | null,
     actor: string | null,
-  ): void {
-    this.sqlite.db
-      .prepare(
-        `INSERT INTO order_events
-           (orderId, type, fromValue, toValue, note, actor, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
+  ): Promise<void> {
+    await this.db.run(
+      `INSERT INTO order_events
+         (orderId, type, fromValue, toValue, note, actor, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
         orderId,
         type,
         fromValue,
@@ -491,22 +500,23 @@ export class OrdersService {
         note,
         actor,
         new Date().toISOString(),
-      );
+      ],
+    );
   }
 
   /**
    * DH<yyMMdd>-<thứ tự trong ngày, 4 chữ số> theo giờ máy chủ. Gọi trong
-   * transaction nên hai đơn cùng lúc không lấy trùng số (SQLite ghi tuần tự,
-   * và cột `code` còn có ràng buộc UNIQUE chặn thêm một lớp).
+   * transaction và khoá dòng đọc được (`FOR UPDATE`) nên hai đơn cùng lúc phải
+   * xếp hàng; cột `code` còn có ràng buộc UNIQUE chặn thêm một lớp.
    */
-  private nextCode(): string {
+  private async nextCode(): Promise<string> {
     const now = new Date();
     const prefix = `DH${pad(now.getFullYear() % 100)}${pad(now.getMonth() + 1)}${pad(now.getDate())}-`;
-    const row = this.sqlite.db
-      .prepare(
-        `SELECT code FROM orders WHERE code LIKE ? ORDER BY code DESC LIMIT 1`,
-      )
-      .get(`${prefix}%`) as { code: string } | undefined;
+    const row = await this.db.get<{ code: string }>(
+      `SELECT code FROM orders WHERE code LIKE ?
+        ORDER BY code DESC LIMIT 1 FOR UPDATE`,
+      [`${prefix}%`],
+    );
 
     const last = row ? Number(row.code.slice(prefix.length)) : 0;
     return `${prefix}${pad(last + 1, 4)}`;

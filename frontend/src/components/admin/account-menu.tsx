@@ -230,7 +230,9 @@ function SignOutDialog({
     <Dialog
       title="Đăng xuất khỏi hệ thống?"
       size="sm"
-      icon={<AlertIcon className="size-4 shrink-0 text-red-600 dark:text-red-400" />}
+      icon={
+        <AlertIcon className="size-4 shrink-0 text-red-600 dark:text-red-400" />
+      }
       onClose={onClose}
       footer={
         <>

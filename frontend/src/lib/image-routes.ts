@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { currentAdmin } from "./admin";
+import type { Permission } from "./access";
+import { currentUserWith } from "./admin";
 import { BackendError } from "./backend";
 
 /**
@@ -26,6 +27,8 @@ export async function handleImageUpload(
   request: Request,
   upload: (image: File) => Promise<string>,
   urlOf: (file: string) => string,
+  /** Quyền cần có để tải ảnh lên (ví dụ `ARTICLES.WRITE`). */
+  permission: Permission,
 ): Promise<Response> {
   // Route xác thực bằng cookie nên phải tự chặn request đến từ trang khác.
   const origin = request.headers.get("origin");
@@ -34,8 +37,11 @@ export async function handleImageUpload(
     return fail("Yêu cầu không hợp lệ.", 403);
   }
 
-  if (!(await currentAdmin())) {
-    return fail("Phiên đăng nhập đã hết hoặc bạn không có quyền quản trị.", 401);
+  if (!(await currentUserWith(permission))) {
+    return fail(
+      "Phiên đăng nhập đã hết hoặc bạn không có quyền tải ảnh lên.",
+      401,
+    );
   }
 
   let formData: FormData;

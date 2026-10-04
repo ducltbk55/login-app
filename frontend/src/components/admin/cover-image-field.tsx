@@ -54,12 +54,15 @@ export function CoverImageField({
     setUploading(true);
     try {
       const response = await fetch(uploadUrl, { method: "POST", body });
-      const data = (await response.json().catch(() => null)) as
-        | { url?: string; error?: { message?: string } }
-        | null;
+      const data = (await response.json().catch(() => null)) as {
+        url?: string;
+        error?: { message?: string };
+      } | null;
 
       if (!response.ok || !data?.url) {
-        setError(data?.error?.message ?? "Không tải được ảnh lên. Thử lại sau.");
+        setError(
+          data?.error?.message ?? "Không tải được ảnh lên. Thử lại sau.",
+        );
         return;
       }
       setBroken(false);

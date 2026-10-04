@@ -6,22 +6,17 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import {
-  createReadStream,
-  existsSync,
-  mkdirSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { createReadStream, existsSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { resolveInsideDir } from '../contacts/attachments';
+import { uploadDir } from './upload-dir';
 
 /**
  * Kho ảnh công khai dùng chung: ảnh trong bài viết, ảnh sản phẩm.
  *
- * Mỗi loại một thư mục con của `data/uploads`, cạnh file DB như đính kèm liên
- * hệ — sao lưu thư mục `data/` là đủ cả dữ liệu lẫn ảnh.
+ * Mỗi loại một thư mục con của `UPLOAD_DIR` (mặc định `data/uploads`), giống
+ * đính kèm liên hệ.
  */
 
 /** 5MB như đính kèm liên hệ, thừa cho ảnh web. */
@@ -100,19 +95,12 @@ export const PUBLIC_IMAGE_HEADERS = {
 export abstract class ImageStore {
   protected constructor(
     private readonly config: ConfigService,
-    /** Thư mục con trong `data/uploads`. */
+    /** Thư mục con trong `UPLOAD_DIR`. */
     private readonly folder: string,
   ) {}
 
   private uploadDir(): string {
-    const file = this.config.get<string>('DATABASE_FILE') ?? 'data/app.db';
-    const absolute = path.isAbsolute(file)
-      ? file
-      : path.join(process.cwd(), file);
-
-    const dir = path.join(path.dirname(absolute), 'uploads', this.folder);
-    mkdirSync(dir, { recursive: true });
-    return dir;
+    return uploadDir(this.config, this.folder);
   }
 
   /**

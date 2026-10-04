@@ -4,10 +4,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { formatVndShort } from "@/lib/format";
-import {
-  productsHref,
-  type ProductFilterValues,
-} from "@/lib/product-filters";
+import { productsHref, type ProductFilterValues } from "@/lib/product-filters";
 import {
   PRICE_SLIDER_MAX,
   PRICE_SLIDER_STEP,
@@ -56,7 +53,10 @@ function PriceRange({
           value={min}
           // Không cho hai con trượt vượt qua nhau.
           onChange={(event) =>
-            onChange(Math.min(Number(event.target.value), max - PRICE_SLIDER_STEP), max)
+            onChange(
+              Math.min(Number(event.target.value), max - PRICE_SLIDER_STEP),
+              max,
+            )
           }
         />
         <input
@@ -67,7 +67,10 @@ function PriceRange({
           step={PRICE_SLIDER_STEP}
           value={max}
           onChange={(event) =>
-            onChange(min, Math.max(Number(event.target.value), min + PRICE_SLIDER_STEP))
+            onChange(
+              min,
+              Math.max(Number(event.target.value), min + PRICE_SLIDER_STEP),
+            )
           }
         />
       </div>
@@ -91,8 +94,13 @@ export function ProductFilters({
   // Bộ lọc được render hai lần (điện thoại + màn rộng) nên id phải riêng.
   const searchId = useId();
   const [search, setSearch] = useState(values.search);
-  const [categoryDetailId, setCategoryDetailId] = useState(values.categoryDetailId);
-  const [price, setPrice] = useState({ min: values.minPrice, max: values.maxPrice });
+  const [categoryDetailId, setCategoryDetailId] = useState(
+    values.categoryDetailId,
+  );
+  const [price, setPrice] = useState({
+    min: values.minPrice,
+    max: values.maxPrice,
+  });
 
   const total = categories.reduce((sum, c) => sum + c.productCount, 0);
   const dirty =
@@ -141,40 +149,41 @@ export function ProductFilters({
       <fieldset>
         <legend className="text-sm font-semibold">Lĩnh vực</legend>
         <ul className="mt-2 space-y-1">
-          {[{ id: undefined, name: "Tất cả", productCount: total }, ...categories].map(
-            (category) => {
-              const checked = categoryDetailId === category.id;
-              return (
-                <li key={category.id ?? "all"}>
-                  <label
-                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition ${
-                      checked
-                        ? "bg-ink-900 font-medium text-white"
-                        : "text-black/70 hover:bg-black/5"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name={`${searchId}-linh-vuc`}
-                        checked={checked}
-                        // Chọn lĩnh vực là lọc ngay, không cần bấm Áp dụng.
-                        onChange={() => {
-                          setCategoryDetailId(category.id);
-                          apply({ categoryDetailId: category.id });
-                        }}
-                        className="sr-only"
-                      />
-                      {category.name}
-                    </span>
-                    <span className="text-xs tabular-nums opacity-60">
-                      {category.productCount}
-                    </span>
-                  </label>
-                </li>
-              );
-            },
-          )}
+          {[
+            { id: undefined, name: "Tất cả", productCount: total },
+            ...categories,
+          ].map((category) => {
+            const checked = categoryDetailId === category.id;
+            return (
+              <li key={category.id ?? "all"}>
+                <label
+                  className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition ${
+                    checked
+                      ? "bg-ink-900 font-medium text-white"
+                      : "text-black/70 hover:bg-black/5"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name={`${searchId}-linh-vuc`}
+                      checked={checked}
+                      // Chọn lĩnh vực là lọc ngay, không cần bấm Áp dụng.
+                      onChange={() => {
+                        setCategoryDetailId(category.id);
+                        apply({ categoryDetailId: category.id });
+                      }}
+                      className="sr-only"
+                    />
+                    {category.name}
+                  </span>
+                  <span className="text-xs tabular-nums opacity-60">
+                    {category.productCount}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
         </ul>
       </fieldset>
 
@@ -234,7 +243,10 @@ export function ProductSortSelect({ values }: { values: ProductFilterValues }) {
         value={values.sort}
         onChange={(event) =>
           router.push(
-            productsHref({ ...values, sort: event.target.value as ProductSort }),
+            productsHref({
+              ...values,
+              sort: event.target.value as ProductSort,
+            }),
             { scroll: false },
           )
         }

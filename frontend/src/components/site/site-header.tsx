@@ -7,11 +7,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { CloseIcon, MenuIcon } from "@/components/admin/icons";
 import { CartLink } from "@/components/site/cart-link";
-import {
-  COMPANY_LOGO,
-  COMPANY_NAME,
-  COMPANY_SHORT_NAME,
-} from "@/lib/company";
+import { COMPANY_LOGO, COMPANY_NAME, COMPANY_SHORT_NAME } from "@/lib/company";
 import { NAV_ITEMS } from "@/lib/site-nav";
 
 /**
@@ -62,7 +58,9 @@ export function SiteHeader({ accountSlot }: { accountSlot: ReactNode }) {
             <Link
               key={item.href}
               href={item.href}
-              aria-current={isActive(item.href, item.exact) ? "page" : undefined}
+              aria-current={
+                isActive(item.href, item.exact) ? "page" : undefined
+              }
               className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                 isActive(item.href, item.exact)
                   ? "text-gold-300"

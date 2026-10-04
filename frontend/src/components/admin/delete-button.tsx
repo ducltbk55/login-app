@@ -69,12 +69,7 @@ export function DeleteButton({
                 <input type="hidden" name="id" value={id} />
                 {fields &&
                   Object.entries(fields).map(([name, value]) => (
-                    <input
-                      key={name}
-                      type="hidden"
-                      name={name}
-                      value={value}
-                    />
+                    <input key={name} type="hidden" name={name} value={value} />
                   ))}
                 <SubmitButton
                   variant="dangerSolid"

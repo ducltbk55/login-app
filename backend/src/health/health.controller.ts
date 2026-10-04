@@ -7,10 +7,10 @@ export class HealthController {
   constructor(private readonly users: UsersService) {}
 
   @Get()
-  check(): { status: 'ok'; users: number; uptime: number } {
+  async check(): Promise<{ status: 'ok'; users: number; uptime: number }> {
     return {
       status: 'ok',
-      users: this.users.countAll(),
+      users: await this.users.countAll(),
       uptime: Math.round(process.uptime()),
     };
   }

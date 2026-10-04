@@ -1,11 +1,7 @@
 import Link from "next/link";
 
 import { ChevronRightIcon } from "@/components/admin/icons";
-import {
-  Field,
-  FilterBar,
-  PageHeader,
-} from "@/components/admin/page-header";
+import { Field, FilterBar, PageHeader } from "@/components/admin/page-header";
 import { SearchableSelect } from "@/components/admin/searchable-select";
 import { UserStatusBadge } from "@/components/admin/user-status-badge";
 import { Badge } from "@/components/badge";
@@ -17,9 +13,7 @@ function pickOne(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function AdminUsersPage(
-  props: PageProps<"/admin/users">,
-) {
+export default async function AdminUsersPage(props: PageProps<"/admin/users">) {
   const params = await props.searchParams;
   const search = pickOne(params.search) ?? "";
   const role = pickOne(params.role) as UserRole | undefined;
@@ -69,7 +63,10 @@ export default async function AdminUsersPage(
           />
         </Field>
         <div className="flex gap-2">
-          <button type="submit" className={`${BUTTON.primary} flex-1 sm:flex-none`}>
+          <button
+            type="submit"
+            className={`${BUTTON.primary} flex-1 sm:flex-none`}
+          >
             Lọc
           </button>
           {(search || role || status) && (
@@ -84,15 +81,18 @@ export default async function AdminUsersPage(
       </FilterBar>
 
       <p className="text-sm text-admin-muted">
-        <span className="font-semibold text-admin-text">{users.length}</span> bản
-        ghi
+        <span className="font-semibold text-admin-text">{users.length}</span>{" "}
+        bản ghi
       </p>
 
       {/* Mobile: mỗi người dùng là một thẻ bấm được, không phải cuộn ngang */}
       <ul className="grid gap-3 md:hidden">
         {users.map((user) => (
           <li key={user.id}>
-            <Link href={`/admin/users/${encodeURIComponent(user.email)}`} className={`${ROW_CARD} block`}>
+            <Link
+              href={`/admin/users/${encodeURIComponent(user.email)}`}
+              className={`${ROW_CARD} block`}
+            >
               <div className="flex items-start gap-3">
                 <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-500/12 text-sm font-semibold text-brand-700 dark:text-brand-300">
                   {(user.name ?? user.email).charAt(0).toUpperCase()}

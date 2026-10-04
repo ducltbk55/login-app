@@ -40,7 +40,10 @@ export function GalleryField({
   /** Thêm vào cuối, bỏ trùng, không vượt giới hạn. */
   const append = (incoming: string[]) =>
     setUrls((current) =>
-      [...current, ...incoming.filter((url) => !current.includes(url))].slice(0, max),
+      [...current, ...incoming.filter((url) => !current.includes(url))].slice(
+        0,
+        max,
+      ),
     );
 
   async function upload(files: File[]) {
@@ -69,11 +72,15 @@ export function GalleryField({
       body.set("upload", file);
       try {
         const response = await fetch(uploadUrl, { method: "POST", body });
-        const data = (await response.json().catch(() => null)) as
-          | { url?: string; error?: { message?: string } }
-          | null;
+        const data = (await response.json().catch(() => null)) as {
+          url?: string;
+          error?: { message?: string };
+        } | null;
         if (response.ok && data?.url) uploaded.push(data.url);
-        else problems.push(`${file.name}: ${data?.error?.message ?? "không tải lên được."}`);
+        else
+          problems.push(
+            `${file.name}: ${data?.error?.message ?? "không tải lên được."}`,
+          );
       } catch {
         problems.push(`${file.name}: không kết nối được máy chủ.`);
       }
@@ -165,7 +172,9 @@ export function GalleryField({
               </span>
               <button
                 type="button"
-                onClick={() => setUrls((current) => current.filter((u) => u !== url))}
+                onClick={() =>
+                  setUrls((current) => current.filter((u) => u !== url))
+                }
                 aria-label={`Bỏ ảnh ${index + 1}`}
                 title="Bỏ ảnh"
                 className="absolute top-1.5 right-1.5 grid size-6 cursor-pointer place-items-center rounded-full bg-black/60 text-white transition hover:bg-red-600"
@@ -254,7 +263,10 @@ export function GalleryField({
       </div>
 
       {errors.length > 0 ? (
-        <ul role="alert" className="space-y-0.5 text-xs text-red-600 dark:text-red-400">
+        <ul
+          role="alert"
+          className="space-y-0.5 text-xs text-red-600 dark:text-red-400"
+        >
           {errors.map((error) => (
             <li key={error}>{error}</li>
           ))}

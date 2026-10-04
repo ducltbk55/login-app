@@ -76,12 +76,12 @@ export class ContactsController {
   constructor(private readonly contacts: ContactsService) {}
 
   @Get()
-  list(@Query() query: ListContactsDto): Paginated<Contact> {
-    return paginate(this.contacts.list(query), query);
+  async list(@Query() query: ListContactsDto): Promise<Paginated<Contact>> {
+    return paginate(await this.contacts.list(query), query);
   }
 
   @Get('stats')
-  stats(): ContactStats {
+  stats(): Promise<ContactStats> {
     return this.contacts.stats();
   }
 
@@ -94,16 +94,16 @@ export class ContactsController {
   @Post()
   @HttpCode(201)
   @UseInterceptors(FileInterceptor('attachment', ATTACHMENT_OPTIONS))
-  create(
+  async create(
     @Body() dto: CreateContactDto,
     @UploadedFile() file?: MulterFile,
-  ): { ok: true } {
-    this.contacts.create(dto, file);
+  ): Promise<{ ok: true }> {
+    await this.contacts.create(dto, file);
     return { ok: true };
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number): Contact {
+  findOne(@Param('id', ParseIntPipe) id: number): Promise<Contact> {
     return this.contacts.findOneOrFail(id);
   }
 
@@ -115,11 +115,11 @@ export class ContactsController {
   @Get(':id/attachment')
   @Header('X-Content-Type-Options', 'nosniff')
   @Header('Cache-Control', 'private, no-store')
-  attachment(
+  async attachment(
     @Param('id', ParseIntPipe) id: number,
     @Res({ passthrough: true }) res: Response,
-  ): StreamableFile {
-    const file = this.contacts.attachmentPath(id);
+  ): Promise<StreamableFile> {
+    const file = await this.contacts.attachmentPath(id);
 
     res.set({
       'Content-Type': file.mime,
@@ -137,13 +137,13 @@ export class ContactsController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateContactDto,
-  ): Contact {
+  ): Promise<Contact> {
     return this.contacts.update(id, dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id', ParseIntPipe) id: number): void {
-    this.contacts.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    await this.contacts.remove(id);
   }
 }

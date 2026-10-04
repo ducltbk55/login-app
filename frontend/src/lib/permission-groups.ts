@@ -1,3 +1,4 @@
+import type { FunctionDef } from "./access";
 import { request, requestOptional, segment } from "./backend";
 
 export type PermissionGroup = {
@@ -34,6 +35,14 @@ export async function listPermissions(): Promise<PermissionDef[]> {
   return result.items;
 }
 
+/** Chức năng đang bật trong danh mục chức năng, theo thứ tự hiển thị. */
+export async function listFunctions(): Promise<FunctionDef[]> {
+  const result = await request<{ items: FunctionDef[] }>(
+    "/permissions/functions",
+  );
+  return result.items;
+}
+
 export async function listPermissionGroups(): Promise<PermissionGroup[]> {
   const result = await request<{ total: number; items: PermissionGroup[] }>(
     "/permission-groups",
@@ -66,7 +75,9 @@ export async function updatePermissionGroup(
   });
 }
 
-export async function deletePermissionGroup(id: string | number): Promise<void> {
+export async function deletePermissionGroup(
+  id: string | number,
+): Promise<void> {
   await request<null>(`/permission-groups/${segment(id)}`, {
     method: "DELETE",
   });

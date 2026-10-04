@@ -4,25 +4,29 @@ import { LoginIcon, UserPlusIcon } from "@/components/admin/icons";
 import { SiteAccountMenu } from "@/components/site/site-account-menu";
 import { SignOutButton } from "@/components/sign-out-button";
 import { auth } from "@/auth";
+import { canEnterAdmin } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 
 /**
  * Khu tài khoản trên thanh điều hướng: chưa đăng nhập thì Đăng nhập | Đăng ký,
  * đã đăng nhập thì sổ dropdown. Là server component vì phải đọc session.
  *
- * `role` lấy từ JWT nên chỉ là ảnh chụp lúc đăng nhập — đủ để hiện/ẩn link vào
- * khu quản trị, còn `/admin` luôn kiểm tra lại DB (xem `lib/admin.ts`).
+ * Link vào khu quản trị dựa trên bản ghi đọc lại từ DB (role + nhóm quyền),
+ * nên vừa được gán nhóm là thấy ngay, không phải đăng nhập lại.
  */
 export async function SiteAccount() {
   const session = await auth();
 
   if (session?.user?.email) {
+    const record = await currentUser().catch(() => null);
+
     return (
       <SiteAccountMenu
         user={{
           name: session.user.name ?? null,
           email: session.user.email,
           image: session.user.image ?? null,
-          isAdmin: session.user.role === "admin",
+          canEnterAdmin: record ? canEnterAdmin(record) : false,
         }}
         signOutSlot={<SignOutButton />}
       />

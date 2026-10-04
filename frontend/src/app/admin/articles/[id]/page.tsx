@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { ArticleForm } from "@/components/admin/article-form";
 import { ExternalIcon } from "@/components/admin/icons";
 import { BackLink, PageHeader } from "@/components/admin/page-header";
+import { can } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { findArticle, listArticleCategories } from "@/lib/articles";
 import { formatDateTime } from "@/lib/format";
 import { BUTTON } from "@/lib/styles";
@@ -13,12 +15,15 @@ export default async function EditArticlePage(
   props: PageProps<"/admin/articles/[id]">,
 ) {
   const { id } = await props.params;
-  const [article, categories] = await Promise.all([
+  const [article, categories, user] = await Promise.all([
     findArticle(id),
     listArticleCategories(),
+    currentUser(),
   ]);
 
   if (!article) notFound();
+  // Layout đã đòi ARTICLES.READ; thiếu WRITE thì vẫn xem được nhưng chỉ đọc.
+  const canWrite = can(user!, "ARTICLES.WRITE");
 
   // Chuyên mục của bài có thể đã bị tắt sau khi bài được tạo. Nếu không ghép
   // nó vào danh sách thì ô chọn sẽ hiện trống và admin vô tình đổi chuyên mục
@@ -40,7 +45,7 @@ export default async function EditArticlePage(
       <BackLink href="/admin/articles">Danh sách bài viết</BackLink>
 
       <PageHeader
-        title={`Sửa: ${article.title}`}
+        title={canWrite ? `Sửa: ${article.title}` : article.title}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-2">
             <span>Tạo lúc {formatDateTime(article.createdAt)}</span>
@@ -69,6 +74,8 @@ export default async function EditArticlePage(
         action={updateArticleAction.bind(null, article.id)}
         cancelHref="/admin/articles"
         submitLabel="Lưu thay đổi"
+        readOnly={!canWrite}
+        canPublish={can(user!, "ARTICLES.PUBLISH")}
       />
     </div>
   );

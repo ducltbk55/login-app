@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Avatar } from "@/components/avatar";
 import { MyOrders } from "@/components/site/my-orders";
+import { canEnterAdmin } from "@/lib/access";
 import { COMPANY_NAME } from "@/lib/company";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { listOrders } from "@/lib/orders";
@@ -98,6 +99,8 @@ export default async function ProfilePage(props: PageProps<"/dashboard">) {
   const name = record?.name ?? session.user.name;
   const image = record?.image ?? session.user.image;
   const isAdmin = record?.role === "admin";
+  // Link quản trị cho cả người được gán nhóm quyền, không riêng role admin.
+  const showAdminLink = record ? canEnterAdmin(record) : false;
 
   return (
     <>
@@ -154,7 +157,7 @@ export default async function ProfilePage(props: PageProps<"/dashboard">) {
               >
                 Chỉnh sửa hồ sơ
               </Link>
-              {isAdmin && (
+              {showAdminLink && (
                 <Link
                   href="/admin"
                   className="inline-flex items-center justify-center rounded-lg border border-white/25 px-5 py-2.5 text-sm font-semibold transition hover:bg-white/10"
@@ -231,7 +234,10 @@ export default async function ProfilePage(props: PageProps<"/dashboard">) {
               value={`#${record?.id ?? session.user.id}`}
               mono
             />
-            <Field label="Đăng nhập bằng" value={record?.provider ?? "google"} />
+            <Field
+              label="Đăng nhập bằng"
+              value={record?.provider ?? "google"}
+            />
             <Field
               label="Ngày tham gia"
               value={formatDateTime(record?.createdAt)}

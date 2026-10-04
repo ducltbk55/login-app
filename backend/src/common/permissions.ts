@@ -132,6 +132,14 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
   },
 ];
 
+/** Một chức năng (mục menu quản trị) đọc ra từ DB. */
+export type FunctionDef = {
+  /** Mã chức năng, là tiền tố của mã quyền: `ARTICLES` -> `ARTICLES.READ`. */
+  code: string;
+  label: string;
+  order: number;
+};
+
 /** Một quyền đọc ra từ DB, dạng mà trang admin dùng để render checkbox. */
 export type PermissionDef = {
   key: string;

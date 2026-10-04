@@ -33,7 +33,9 @@ export function parseVideoUrl(raw: string): ParsedVideo | null {
   const parts = url.pathname.split("/").filter(Boolean);
 
   if (host === "youtu.be") {
-    return YOUTUBE_ID.test(parts[0] ?? "") ? { kind: "youtube", id: parts[0] } : null;
+    return YOUTUBE_ID.test(parts[0] ?? "")
+      ? { kind: "youtube", id: parts[0] }
+      : null;
   }
   if (YOUTUBE_HOSTS.has(host)) {
     const id =
@@ -46,10 +48,14 @@ export function parseVideoUrl(raw: string): ParsedVideo | null {
   }
 
   if (host === "vimeo.com" || host === "www.vimeo.com") {
-    return VIMEO_ID.test(parts[0] ?? "") ? { kind: "vimeo", id: parts[0] } : null;
+    return VIMEO_ID.test(parts[0] ?? "")
+      ? { kind: "vimeo", id: parts[0] }
+      : null;
   }
   if (host === "player.vimeo.com" && parts[0] === "video") {
-    return VIMEO_ID.test(parts[1] ?? "") ? { kind: "vimeo", id: parts[1] } : null;
+    return VIMEO_ID.test(parts[1] ?? "")
+      ? { kind: "vimeo", id: parts[1] }
+      : null;
   }
 
   if (url.protocol === "https:" && /\.(mp4|webm)$/i.test(url.pathname)) {

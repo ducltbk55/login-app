@@ -17,6 +17,8 @@ import {
   listContacts,
   type ContactStatus,
 } from "@/lib/contacts";
+import { can } from "@/lib/access";
+import { currentUser } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 import {
   BUTTON,
@@ -41,10 +43,13 @@ export default async function AdminContactsPage(
   const status = pickOne(params.status) as ContactStatus | undefined;
   const page = Number(pickOne(params.page) ?? 1);
 
-  const [result, stats] = await Promise.all([
+  const [result, stats, user] = await Promise.all([
     listContacts({ search, status, page: Number.isFinite(page) ? page : 1 }),
     getContactStats(),
+    currentUser(),
   ]);
+  // Layout chỉ đòi CONTACTS.READ — đổi trạng thái/xoá cần CONTACTS.WRITE.
+  const canWrite = can(user!, "CONTACTS.WRITE");
 
   const contacts = result.items;
   const filtered = Boolean(search || status);
@@ -115,12 +120,12 @@ export default async function AdminContactsPage(
             defaultValue={status ?? ""}
             options={[
               { value: "", label: "Tất cả" },
-              ...(
-                Object.keys(CONTACT_STATUS_LABELS) as ContactStatus[]
-              ).map((value) => ({
-                value,
-                label: CONTACT_STATUS_LABELS[value],
-              })),
+              ...(Object.keys(CONTACT_STATUS_LABELS) as ContactStatus[]).map(
+                (value) => ({
+                  value,
+                  label: CONTACT_STATUS_LABELS[value],
+                }),
+              ),
             ]}
           />
         </Field>
@@ -184,11 +189,13 @@ export default async function AdminContactsPage(
                 <ListIcon className="size-3.5" />
                 Xem
               </Link>
-              <DeleteButton
-                id={contact.id}
-                action={deleteContactAction}
-                confirmText={`Xoá liên hệ của "${contact.name}"? Tệp đính kèm cũng bị xoá theo.`}
-              />
+              {canWrite && (
+                <DeleteButton
+                  id={contact.id}
+                  action={deleteContactAction}
+                  confirmText={`Xoá liên hệ của "${contact.name}"? Tệp đính kèm cũng bị xoá theo.`}
+                />
+              )}
             </div>
           </li>
         ))}
@@ -250,7 +257,9 @@ export default async function AdminContactsPage(
                       className="inline-flex max-w-40 items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline dark:text-brand-300"
                     >
                       <PaperclipIcon className="size-4 shrink-0" />
-                      <span className="truncate">{contact.attachment.name}</span>
+                      <span className="truncate">
+                        {contact.attachment.name}
+                      </span>
                     </Link>
                   ) : (
                     <span className="text-sm text-admin-muted">—</span>
@@ -266,11 +275,13 @@ export default async function AdminContactsPage(
                 </td>
                 <td className={TABLE.td}>
                   <div className="flex items-center justify-end gap-2">
-                    <ContactStatusButtons
-                      id={contact.id}
-                      current={contact.status}
-                      action={setContactStatusAction}
-                    />
+                    {canWrite && (
+                      <ContactStatusButtons
+                        id={contact.id}
+                        current={contact.status}
+                        action={setContactStatusAction}
+                      />
+                    )}
                     <Link
                       href={`/admin/contacts/${contact.id}`}
                       title="Xem chi tiết"
@@ -279,11 +290,13 @@ export default async function AdminContactsPage(
                     >
                       <ListIcon className="size-4" />
                     </Link>
-                    <DeleteButton
-                      id={contact.id}
-                      action={deleteContactAction}
-                      confirmText={`Xoá liên hệ của "${contact.name}"? Tệp đính kèm cũng bị xoá theo.`}
-                    />
+                    {canWrite && (
+                      <DeleteButton
+                        id={contact.id}
+                        action={deleteContactAction}
+                        confirmText={`Xoá liên hệ của "${contact.name}"? Tệp đính kèm cũng bị xoá theo.`}
+                      />
+                    )}
                   </div>
                 </td>
               </tr>
@@ -293,7 +306,9 @@ export default async function AdminContactsPage(
                 <td colSpan={6} className="px-0 py-0">
                   <EmptyState
                     icon={<MailIcon className="size-6" />}
-                    title={filtered ? "Không có kết quả" : "Chưa có liên hệ nào"}
+                    title={
+                      filtered ? "Không có kết quả" : "Chưa có liên hệ nào"
+                    }
                     description={
                       filtered
                         ? "Thử đổi từ khoá hoặc bỏ bộ lọc trạng thái."

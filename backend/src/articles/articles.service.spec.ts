@@ -1,20 +1,17 @@
 import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 
 import { CategoriesModule } from '../categories/categories.module';
 import { CategoriesService } from '../categories/categories.service';
 import { CategoryDetailsService } from '../categories/category-details.service';
 import { ARTICLE_CATEGORY_CODE } from '../common/article-categories';
 import { DatabaseModule } from '../database/database.module';
+import { testDatabaseConfig } from '../database/testing';
 import { ArticleCategoriesService } from './article-categories.service';
 import { ArticlesService } from './articles.service';
 
 describe('ArticlesService', () => {
   let moduleRef: TestingModule;
-  let tempDir: string;
   let articles: ArticlesService;
   let articleCategories: ArticleCategoriesService;
   let categories: CategoriesService;
@@ -30,15 +27,16 @@ describe('ArticlesService', () => {
     author: 'Lê Trung Đức',
   });
 
-  beforeEach(async () => {
-    tempDir = mkdtempSync(path.join(tmpdir(), 'nest-articles-'));
+  const detailId = async (code: string) =>
+    (await articleCategories.list()).find((d) => d.code === code)!.id;
 
+  beforeEach(async () => {
     moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
           ignoreEnvFile: true,
-          load: [() => ({ DATABASE_FILE: path.join(tempDir, 'test.db') })],
+          load: [() => testDatabaseConfig()],
         }),
         DatabaseModule,
         CategoriesModule,
@@ -52,22 +50,19 @@ describe('ArticlesService', () => {
     categories = moduleRef.get(CategoriesService);
     details = moduleRef.get(CategoryDetailsService);
 
-    tinNoiBo = articleCategories
-      .list()
-      .find((d) => d.code === 'TIN_NOI_BO')!.id;
+    tinNoiBo = await detailId('TIN_NOI_BO');
   });
 
   afterEach(async () => {
     await moduleRef.close();
-    rmSync(tempDir, { recursive: true, force: true });
   });
 
   describe('danh mục chuyên mục', () => {
-    it('tạo sẵn DM_CHUYEN_MUC với 4 chuyên mục mặc định', () => {
-      const category = articleCategories.category();
+    it('tạo sẵn DM_CHUYEN_MUC với 4 chuyên mục mặc định', async () => {
+      const category = await articleCategories.category();
       expect(category?.code).toBe(ARTICLE_CATEGORY_CODE);
 
-      expect(articleCategories.list().map((d) => d.name)).toEqual([
+      expect((await articleCategories.list()).map((d) => d.name)).toEqual([
         'Tin nội bộ',
         'Hoạt động khách hàng',
         'Tin công nghệ',
@@ -75,32 +70,36 @@ describe('ArticlesService', () => {
       ]);
     });
 
-    it('chạy seed lần nữa không tạo trùng', () => {
-      articleCategories.ensureSeeded();
-      articleCategories.ensureSeeded();
+    it('chạy seed lần nữa không tạo trùng', async () => {
+      await articleCategories.ensureSeeded();
+      await articleCategories.ensureSeeded();
 
-      expect(articleCategories.list()).toHaveLength(4);
+      expect(await articleCategories.list()).toHaveLength(4);
       expect(
-        categories.list().filter((c) => c.code === ARTICLE_CATEGORY_CODE),
+        (await categories.list()).filter(
+          (c) => c.code === ARTICLE_CATEGORY_CODE,
+        ),
       ).toHaveLength(1);
     });
 
-    it('giữ nguyên tên chuyên mục mà admin đã sửa', () => {
-      const category = articleCategories.category()!;
-      details.update(category.id, tinNoiBo, { name: 'Tin trong công ty' });
+    it('giữ nguyên tên chuyên mục mà admin đã sửa', async () => {
+      const category = (await articleCategories.category())!;
+      await details.update(category.id, tinNoiBo, {
+        name: 'Tin trong công ty',
+      });
 
-      articleCategories.ensureSeeded();
+      await articleCategories.ensureSeeded();
 
-      expect(articles.list()).toEqual([]);
+      expect(await articles.list()).toEqual([]);
       expect(
-        articleCategories.list().find((d) => d.id === tinNoiBo)?.name,
+        (await articleCategories.list()).find((d) => d.id === tinNoiBo)?.name,
       ).toBe('Tin trong công ty');
     });
   });
 
   describe('tạo bài', () => {
-    it('sinh slug từ tiêu đề, bỏ dấu tiếng Việt', () => {
-      const article = articles.create({
+    it('sinh slug từ tiêu đề, bỏ dấu tiếng Việt', async () => {
+      const article = await articles.create({
         ...draft(),
         title: 'Chuyển đổi số cho doanh nghiệp',
       });
@@ -108,10 +107,10 @@ describe('ArticlesService', () => {
       expect(article.slug).toBe('chuyen-doi-so-cho-doanh-nghiep');
     });
 
-    it('trùng slug thì nối số thứ tự thay vì báo lỗi', () => {
-      const first = articles.create(draft());
-      const second = articles.create(draft());
-      const third = articles.create(draft());
+    it('trùng slug thì nối số thứ tự thay vì báo lỗi', async () => {
+      const first = await articles.create(draft());
+      const second = await articles.create(draft());
+      const third = await articles.create(draft());
 
       expect([first.slug, second.slug, third.slug]).toEqual([
         'bai-thu-nghiem',
@@ -120,8 +119,8 @@ describe('ArticlesService', () => {
       ]);
     });
 
-    it('mặc định là bản nháp, chưa có ngày đăng, chưa lên sóng', () => {
-      const article = articles.create(draft());
+    it('mặc định là bản nháp, chưa có ngày đăng, chưa lên sóng', async () => {
+      const article = await articles.create(draft());
 
       expect(article.status).toBe('draft');
       expect(article.publishedAt).toBeNull();
@@ -130,15 +129,18 @@ describe('ArticlesService', () => {
       expect(article.featured).toBe(false);
     });
 
-    it('xuất bản mà không chọn ngày thì lấy thời điểm hiện tại', () => {
-      const article = articles.create({ ...draft(), status: 'published' });
+    it('xuất bản mà không chọn ngày thì lấy thời điểm hiện tại', async () => {
+      const article = await articles.create({
+        ...draft(),
+        status: 'published',
+      });
 
       expect(article.publishedAt).not.toBeNull();
       expect(article.live).toBe(true);
     });
 
-    it('kèm chuyên mục để khỏi phải gọi thêm một vòng', () => {
-      const article = articles.create(draft());
+    it('kèm chuyên mục để khỏi phải gọi thêm một vòng', async () => {
+      const article = await articles.create(draft());
 
       expect(article.category).toMatchObject({
         id: tinNoiBo,
@@ -147,9 +149,9 @@ describe('ArticlesService', () => {
       });
     });
 
-    it('ước lượng số phút đọc từ độ dài nội dung', () => {
-      const short = articles.create(draft());
-      const long = articles.create({
+    it('ước lượng số phút đọc từ độ dài nội dung', async () => {
+      const short = await articles.create(draft());
+      const long = await articles.create({
         ...draft(),
         title: 'Bài dài',
         content: Array.from({ length: 600 }, () => 'từ').join(' '),
@@ -159,36 +161,39 @@ describe('ArticlesService', () => {
       expect(long.readingMinutes).toBe(3); // 600 / 200
     });
 
-    it('từ chối chuyên mục không thuộc DM_CHUYEN_MUC', () => {
-      const other = categories.create({
+    it('từ chối chuyên mục không thuộc DM_CHUYEN_MUC', async () => {
+      const other = await categories.create({
         code: 'DM_KHAC',
         name: 'Danh mục khác',
       });
-      const foreign = details.create(other.id, { code: 'X', name: 'X' });
+      const foreign = await details.create(other.id, {
+        code: 'X',
+        name: 'X',
+      });
 
-      expect(() =>
+      await expect(
         articles.create({ ...draft(), categoryDetailId: foreign.id }),
-      ).toThrow(/Chuyên mục không hợp lệ/);
+      ).rejects.toThrow(/Chuyên mục không hợp lệ/);
     });
 
-    it('từ chối chuyên mục đã tắt', () => {
-      const category = articleCategories.category()!;
-      details.update(category.id, tinNoiBo, { status: 'inactive' });
+    it('từ chối chuyên mục đã tắt', async () => {
+      const category = (await articleCategories.category())!;
+      await details.update(category.id, tinNoiBo, { status: 'inactive' });
 
-      expect(() => articles.create(draft())).toThrow(/đang tắt/);
+      await expect(articles.create(draft())).rejects.toThrow(/đang tắt/);
     });
 
-    it('từ chối chuyên mục không tồn tại', () => {
-      expect(() =>
+    it('từ chối chuyên mục không tồn tại', async () => {
+      await expect(
         articles.create({ ...draft(), categoryDetailId: 99999 }),
-      ).toThrow(/Chuyên mục không hợp lệ/);
+      ).rejects.toThrow(/Chuyên mục không hợp lệ/);
     });
   });
 
   describe('đặt lịch đăng', () => {
-    it('ngày đăng ở tương lai thì chưa lên sóng', () => {
+    it('ngày đăng ở tương lai thì chưa lên sóng', async () => {
       const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
-      const article = articles.create({
+      const article = await articles.create({
         ...draft(),
         status: 'published',
         publishedAt: tomorrow,
@@ -198,41 +203,52 @@ describe('ArticlesService', () => {
       expect(article.live).toBe(false);
     });
 
-    it('bộ lọc live bỏ qua bài hẹn giờ và bài nháp', () => {
-      articles.create({ ...draft(), title: 'Nháp' });
-      articles.create({
+    it('bộ lọc live bỏ qua bài hẹn giờ và bài nháp', async () => {
+      await articles.create({ ...draft(), title: 'Nháp' });
+      await articles.create({
         ...draft(),
         title: 'Hẹn giờ',
         status: 'published',
         publishedAt: new Date(Date.now() + 86_400_000).toISOString(),
       });
-      articles.create({ ...draft(), title: 'Đang đăng', status: 'published' });
+      await articles.create({
+        ...draft(),
+        title: 'Đang đăng',
+        status: 'published',
+      });
 
-      expect(articles.list({ live: true }).map((a) => a.title)).toEqual([
-        'Đang đăng',
-      ]);
+      expect((await articles.list({ live: true })).map((a) => a.title)).toEqual(
+        ['Đang đăng'],
+      );
     });
 
-    it('bài lưu trữ cũng không lên sóng', () => {
-      const article = articles.create({ ...draft(), status: 'published' });
-      const archived = articles.update(article.id, { status: 'archived' });
+    it('bài lưu trữ cũng không lên sóng', async () => {
+      const article = await articles.create({
+        ...draft(),
+        status: 'published',
+      });
+      const archived = await articles.update(article.id, {
+        status: 'archived',
+      });
 
       expect(archived.live).toBe(false);
-      expect(articles.list({ live: true })).toEqual([]);
+      expect(await articles.list({ live: true })).toEqual([]);
       // Ngày đăng cũ vẫn giữ, để biết bài từng lên sóng lúc nào.
       expect(archived.publishedAt).toBe(article.publishedAt);
     });
   });
 
   describe('sửa bài', () => {
-    it('trường không gửi lên thì giữ nguyên', () => {
-      const article = articles.create({
+    it('trường không gửi lên thì giữ nguyên', async () => {
+      const article = await articles.create({
         ...draft(),
         summary: 'Tóm tắt gốc',
         coverImage: 'https://example.com/a.png',
       });
 
-      const updated = articles.update(article.id, { title: 'Tiêu đề mới' });
+      const updated = await articles.update(article.id, {
+        title: 'Tiêu đề mới',
+      });
 
       expect(updated.title).toBe('Tiêu đề mới');
       expect(updated.summary).toBe('Tóm tắt gốc');
@@ -242,68 +258,75 @@ describe('ArticlesService', () => {
       expect(updated.slug).toBe(article.slug);
     });
 
-    it('gửi slug mới thì đổi, vẫn bảo đảm duy nhất', () => {
-      articles.create({ ...draft(), title: 'Bài A' });
-      const b = articles.create({ ...draft(), title: 'Bài B' });
+    it('gửi slug mới thì đổi, vẫn bảo đảm duy nhất', async () => {
+      await articles.create({ ...draft(), title: 'Bài A' });
+      const b = await articles.create({ ...draft(), title: 'Bài B' });
 
-      expect(articles.update(b.id, { slug: 'bai-a' }).slug).toBe('bai-a-2');
-    });
-
-    it('giữ nguyên slug của chính nó khi gửi lại y hệt', () => {
-      const article = articles.create(draft());
-      expect(articles.update(article.id, { slug: article.slug }).slug).toBe(
-        article.slug,
+      expect((await articles.update(b.id, { slug: 'bai-a' })).slug).toBe(
+        'bai-a-2',
       );
     });
 
-    it('xoá rỗng tóm tắt được', () => {
-      const article = articles.create({ ...draft(), summary: 'Có tóm tắt' });
-      expect(articles.update(article.id, { summary: null }).summary).toBeNull();
+    it('giữ nguyên slug của chính nó khi gửi lại y hệt', async () => {
+      const article = await articles.create(draft());
+      expect(
+        (await articles.update(article.id, { slug: article.slug })).slug,
+      ).toBe(article.slug);
     });
 
-    it('chuyển nháp sang xuất bản thì tự điền ngày đăng', () => {
-      const article = articles.create(draft());
+    it('xoá rỗng tóm tắt được', async () => {
+      const article = await articles.create({
+        ...draft(),
+        summary: 'Có tóm tắt',
+      });
+      expect(
+        (await articles.update(article.id, { summary: null })).summary,
+      ).toBeNull();
+    });
+
+    it('chuyển nháp sang xuất bản thì tự điền ngày đăng', async () => {
+      const article = await articles.create(draft());
       expect(article.publishedAt).toBeNull();
 
-      const published = articles.update(article.id, { status: 'published' });
+      const published = await articles.update(article.id, {
+        status: 'published',
+      });
       expect(published.publishedAt).not.toBeNull();
       expect(published.live).toBe(true);
     });
 
-    it('đổi sang chuyên mục không hợp lệ thì bị chặn', () => {
-      const article = articles.create(draft());
-      expect(() =>
+    it('đổi sang chuyên mục không hợp lệ thì bị chặn', async () => {
+      const article = await articles.create(draft());
+      await expect(
         articles.update(article.id, { categoryDetailId: 99999 }),
-      ).toThrow(/Chuyên mục không hợp lệ/);
+      ).rejects.toThrow(/Chuyên mục không hợp lệ/);
     });
   });
 
   describe('danh sách', () => {
-    beforeEach(() => {
-      const congNghe = articleCategories
-        .list()
-        .find((d) => d.code === 'TIN_CONG_NGHE')!.id;
+    beforeEach(async () => {
+      const congNghe = await detailId('TIN_CONG_NGHE');
 
-      articles.create({
+      await articles.create({
         ...draft(),
         title: 'Tin cũ',
         status: 'published',
         publishedAt: '2026-01-01T00:00:00.000Z',
       });
-      articles.create({
+      await articles.create({
         ...draft(),
         title: 'Tin mới',
         status: 'published',
         publishedAt: '2026-06-01T00:00:00.000Z',
       });
-      articles.create({
+      await articles.create({
         ...draft(),
         categoryDetailId: congNghe,
         title: 'Chuyện công nghệ',
         status: 'published',
         publishedAt: '2026-03-01T00:00:00.000Z',
       });
-      articles.create({
+      await articles.create({
         ...draft(),
         title: 'Bài nổi bật',
         status: 'published',
@@ -312,8 +335,8 @@ describe('ArticlesService', () => {
       });
     });
 
-    it('bài nổi bật lên đầu, phần còn lại mới nhất trước', () => {
-      expect(articles.list().map((a) => a.title)).toEqual([
+    it('bài nổi bật lên đầu, phần còn lại mới nhất trước', async () => {
+      expect((await articles.list()).map((a) => a.title)).toEqual([
         'Bài nổi bật',
         'Tin mới',
         'Chuyện công nghệ',
@@ -321,32 +344,30 @@ describe('ArticlesService', () => {
       ]);
     });
 
-    it('lọc theo chuyên mục', () => {
-      const congNghe = articleCategories
-        .list()
-        .find((d) => d.code === 'TIN_CONG_NGHE')!.id;
+    it('lọc theo chuyên mục', async () => {
+      const congNghe = await detailId('TIN_CONG_NGHE');
 
       expect(
-        articles.list({ categoryDetailId: congNghe }).map((a) => a.title),
+        (await articles.list({ categoryDetailId: congNghe })).map(
+          (a) => a.title,
+        ),
       ).toEqual(['Chuyện công nghệ']);
     });
 
-    it('tìm kiếm bỏ dấu, không phân biệt hoa thường', () => {
+    it('tìm kiếm bỏ dấu, không phân biệt hoa thường', async () => {
       expect(
-        articles.list({ search: 'cong nghe' }).map((a) => a.title),
+        (await articles.list({ search: 'cong nghe' })).map((a) => a.title),
       ).toEqual(['Chuyện công nghệ']);
     });
 
-    it('tìm được theo tên tác giả', () => {
-      expect(articles.list({ search: 'duc' })).toHaveLength(4);
+    it('tìm được theo tên tác giả', async () => {
+      expect(await articles.list({ search: 'duc' })).toHaveLength(4);
     });
 
-    it('đếm bài theo từng chuyên mục', () => {
-      const congNghe = articleCategories
-        .list()
-        .find((d) => d.code === 'TIN_CONG_NGHE')!.id;
+    it('đếm bài theo từng chuyên mục', async () => {
+      const congNghe = await detailId('TIN_CONG_NGHE');
 
-      expect(articles.countsByCategory()).toEqual({
+      expect(await articles.countsByCategory()).toEqual({
         [tinNoiBo]: 3,
         [congNghe]: 1,
       });
@@ -354,12 +375,12 @@ describe('ArticlesService', () => {
   });
 
   describe('lượt xem', () => {
-    it('tăng theo slug và không đụng tới updatedAt', () => {
-      const article = articles.create(draft());
+    it('tăng theo slug và không đụng tới updatedAt', async () => {
+      const article = await articles.create(draft());
 
-      articles.recordView(article.slug);
-      articles.recordView(article.slug);
-      const after = articles.findOneOrFail(article.id);
+      await articles.recordView(article.slug);
+      await articles.recordView(article.slug);
+      const after = await articles.findOneOrFail(article.id);
 
       expect(after.viewCount).toBe(2);
       expect(after.updatedAt).toBe(article.updatedAt);
@@ -367,28 +388,30 @@ describe('ArticlesService', () => {
   });
 
   describe('xoá', () => {
-    it('xoá được bài viết', () => {
-      const article = articles.create(draft());
-      articles.remove(article.id);
+    it('xoá được bài viết', async () => {
+      const article = await articles.create(draft());
+      await articles.remove(article.id);
 
-      expect(articles.findOne(article.id)).toBeNull();
+      expect(await articles.findOne(article.id)).toBeNull();
     });
 
-    it('không xoá được chuyên mục đang có bài', () => {
-      const category = articleCategories.category()!;
-      articles.create(draft());
+    it('không xoá được chuyên mục đang có bài', async () => {
+      const category = (await articleCategories.category())!;
+      await articles.create(draft());
 
-      expect(() => details.remove(category.id, tinNoiBo)).toThrow(
+      await expect(details.remove(category.id, tinNoiBo)).rejects.toThrow(
         /đang có 1 bài viết/,
       );
     });
 
-    it('xoá hết bài thì xoá được chuyên mục', () => {
-      const category = articleCategories.category()!;
-      const article = articles.create(draft());
-      articles.remove(article.id);
+    it('xoá hết bài thì xoá được chuyên mục', async () => {
+      const category = (await articleCategories.category())!;
+      const article = await articles.create(draft());
+      await articles.remove(article.id);
 
-      expect(() => details.remove(category.id, tinNoiBo)).not.toThrow();
+      await expect(
+        details.remove(category.id, tinNoiBo),
+      ).resolves.toBeUndefined();
     });
   });
 });

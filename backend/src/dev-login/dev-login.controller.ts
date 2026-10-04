@@ -25,14 +25,14 @@ export class DevLoginController {
 
   /** Danh sách tài khoản để frontend dựng màn hình chọn. */
   @Get('users')
-  list(): { total: number; items: User[] } {
-    const items = this.users.findAll();
+  async list(): Promise<{ total: number; items: User[] }> {
+    const items = await this.users.findAll();
     return { total: items.length, items };
   }
 
   /** Một tài khoản theo id — thứ mà `/users/:email` không làm được. */
   @Get('users/:id')
-  findOne(@Param('id', ParseIntPipe) id: number): UserDetail {
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<UserDetail> {
     return this.users.findDetailByIdOrFail(id);
   }
 }

@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 
 import { ApiKeyGuard } from '../common/api-key.guard';
-import type { PermissionDef } from '../common/permissions';
+import type { FunctionDef, PermissionDef } from '../common/permissions';
 import { PermissionCatalogService } from './permission-catalog.service';
 import {
   CreatePermissionGroupDto,
@@ -31,37 +31,47 @@ export class PermissionGroupsController {
 
   /** Quyền đang bật trong danh mục quyền, để admin render checkbox. */
   @Get('permissions')
-  permissions(): { items: PermissionDef[] } {
-    return { items: this.catalog.list() };
+  async permissions(): Promise<{ items: PermissionDef[] }> {
+    return { items: await this.catalog.list() };
+  }
+
+  /** Chức năng đang bật, theo thứ tự — frontend dựng menu quản trị từ đây. */
+  @Get('permissions/functions')
+  async functions(): Promise<{ items: FunctionDef[] }> {
+    return { items: await this.catalog.functions() };
   }
 
   @Get('permission-groups')
-  list(): { total: number; items: PermissionGroup[] } {
-    const items = this.groups.list();
+  async list(): Promise<{ total: number; items: PermissionGroup[] }> {
+    const items = await this.groups.list();
     return { total: items.length, items };
   }
 
   @Get('permission-groups/:id')
-  findOne(@Param('id', ParseIntPipe) id: number): PermissionGroup {
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<PermissionGroup> {
     return this.groups.findOneOrFail(id);
   }
 
   @Post('permission-groups')
-  create(@Body() dto: CreatePermissionGroupDto): PermissionGroup {
+  async create(
+    @Body() dto: CreatePermissionGroupDto,
+  ): Promise<PermissionGroup> {
     return this.groups.create(dto);
   }
 
   @Patch('permission-groups/:id')
-  update(
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdatePermissionGroupDto,
-  ): PermissionGroup {
+  ): Promise<PermissionGroup> {
     return this.groups.update(id, dto);
   }
 
   @Delete('permission-groups/:id')
   @HttpCode(204)
-  remove(@Param('id', ParseIntPipe) id: number): void {
-    this.groups.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    await this.groups.remove(id);
   }
 }

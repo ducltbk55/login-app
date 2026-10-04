@@ -81,7 +81,9 @@ function Placed({
         <>
           <p className="mt-3 text-black/70">
             Mã đơn của bạn là{" "}
-            <strong className="font-mono text-lg text-ink-900">{order.code}</strong>
+            <strong className="font-mono text-lg text-ink-900">
+              {order.code}
+            </strong>
             . Tổng thanh toán{" "}
             <strong className="text-ink-900">{formatVnd(order.total)}</strong>.
           </p>
@@ -99,7 +101,9 @@ function Placed({
           )}
         </>
       ) : (
-        <p className="mt-3 text-black/70">Chúng tôi sẽ liên hệ xác nhận đơn sớm.</p>
+        <p className="mt-3 text-black/70">
+          Chúng tôi sẽ liên hệ xác nhận đơn sớm.
+        </p>
       )}
       <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
         {loggedIn && (
@@ -160,7 +164,12 @@ export function CheckoutForm({
     );
   }
   if (data.status === "loading") {
-    return <div className="h-96 animate-pulse rounded-3xl bg-black/5" aria-busy="true" />;
+    return (
+      <div
+        className="h-96 animate-pulse rounded-3xl bg-black/5"
+        aria-busy="true"
+      />
+    );
   }
 
   const { rows, buyable, total, saved } = data;
@@ -193,15 +202,26 @@ export function CheckoutForm({
       className="grid gap-8 lg:grid-cols-[1fr_24rem]"
     >
       {/* Bẫy bot: người thật không nhìn thấy nên không bao giờ điền */}
-      <div aria-hidden className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
+      <div
+        aria-hidden
+        className="absolute left-[-9999px] h-0 w-0 overflow-hidden"
+      >
         <label htmlFor="checkout-website">Để trống ô này</label>
-        <input id="checkout-website" name="website" tabIndex={-1} autoComplete="off" />
+        <input
+          id="checkout-website"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+        />
       </div>
       <input
         type="hidden"
         name="items"
         value={JSON.stringify(
-          buyable.map((row) => ({ productId: row.product.id, quantity: row.qty })),
+          buyable.map((row) => ({
+            productId: row.product.id,
+            quantity: row.qty,
+          })),
         )}
       />
 
@@ -219,7 +239,11 @@ export function CheckoutForm({
                 className={INPUT}
               />
             </Field>
-            <Field label="Số điện thoại" required hint="Để chúng tôi gọi xác nhận đơn.">
+            <Field
+              label="Số điện thoại"
+              required
+              hint="Để chúng tôi gọi xác nhận đơn."
+            >
               <input
                 name="customerPhone"
                 type="tel"
@@ -231,7 +255,10 @@ export function CheckoutForm({
                 className={INPUT}
               />
             </Field>
-            <Field label="Email" hint="Nhận thông tin đơn qua email (tuỳ chọn).">
+            <Field
+              label="Email"
+              hint="Nhận thông tin đơn qua email (tuỳ chọn)."
+            >
               <input
                 name="customerEmail"
                 type="email"
@@ -307,7 +334,10 @@ export function CheckoutForm({
         <ul className="mt-4 space-y-3">
           {buyable.map(({ product, qty }) => (
             <li key={product.id} className="flex gap-3 text-sm">
-              <ProductImage product={product} className="size-14 shrink-0 rounded-lg" />
+              <ProductImage
+                product={product}
+                className="size-14 shrink-0 rounded-lg"
+              />
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{product.name}</p>
                 <p className="text-black/55 tabular-nums">

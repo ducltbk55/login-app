@@ -6,7 +6,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { slugify } from '../common/slugify';
-import { SqliteService } from '../database/sqlite.service';
+import { DatabaseService } from '../database/database.service';
 import {
   CreatePermissionGroupDto,
   UpdatePermissionGroupDto,
@@ -30,90 +30,91 @@ export class PermissionGroupsService implements OnModuleInit {
   private readonly logger = new Logger(PermissionGroupsService.name);
 
   constructor(
-    private readonly sqlite: SqliteService,
+    private readonly db: DatabaseService,
     private readonly catalog: PermissionCatalogService,
   ) {}
 
   /** Tạo sẵn nhóm "Administrators" (đủ quyền) nếu DB chưa có nhóm nào. */
-  onModuleInit(): void {
+  async onModuleInit(): Promise<void> {
     // Nhóm mặc định cần danh mục quyền đã có dữ liệu.
-    this.catalog.ensureSeeded();
-    if (this.count() > 0) return;
+    await this.catalog.ensureSeeded();
+    if ((await this.count()) > 0) return;
 
-    this.create({
+    await this.create({
       name: 'Administrators',
       slug: ADMIN_GROUP_SLUG,
       description: 'Nhóm mặc định, có toàn bộ quyền của hệ thống',
-      permissions: this.catalog.keys(),
+      permissions: await this.catalog.keys(),
     });
     this.logger.log('Đã tạo nhóm quyền mặc định "Administrators"');
   }
 
-  list(): PermissionGroup[] {
-    const rows = this.sqlite.db
-      .prepare('SELECT * FROM permission_groups ORDER BY name COLLATE NOCASE')
-      .all() as GroupRow[];
+  async list(): Promise<PermissionGroup[]> {
+    const rows = await this.db.all<GroupRow>(
+      'SELECT * FROM permission_groups ORDER BY name',
+    );
 
-    return rows.map((row) => this.hydrate(row));
+    return Promise.all(rows.map((row) => this.hydrate(row)));
   }
 
-  findOne(id: number): PermissionGroup | null {
-    const row = this.sqlite.db
-      .prepare('SELECT * FROM permission_groups WHERE id = ?')
-      .get(id) as GroupRow | undefined;
+  async findOne(id: number): Promise<PermissionGroup | null> {
+    const row = await this.db.get<GroupRow>(
+      'SELECT * FROM permission_groups WHERE id = ?',
+      [id],
+    );
     return row ? this.hydrate(row) : null;
   }
 
-  findOneOrFail(id: number): PermissionGroup {
-    const group = this.findOne(id);
+  async findOneOrFail(id: number): Promise<PermissionGroup> {
+    const group = await this.findOne(id);
     if (!group) {
       throw new NotFoundException(`Không tìm thấy nhóm quyền ${id}`);
     }
     return group;
   }
 
-  count(): number {
-    const row = this.sqlite.db
-      .prepare('SELECT COUNT(*) AS total FROM permission_groups')
-      .get() as { total: number } | undefined;
+  async count(): Promise<number> {
+    const row = await this.db.get<{ total: number }>(
+      'SELECT COUNT(*) AS total FROM permission_groups',
+    );
     return Number(row?.total ?? 0);
   }
 
-  create(dto: CreatePermissionGroupDto): PermissionGroup {
+  async create(dto: CreatePermissionGroupDto): Promise<PermissionGroup> {
     const now = new Date().toISOString();
-    const slug = this.resolveSlug(dto.slug, dto.name);
+    const slug = await this.resolveSlug(dto.slug, dto.name);
 
-    return this.sqlite.transaction(() => {
-      const result = this.sqlite.db
-        .prepare(
-          `INSERT INTO permission_groups
-             (name, slug, description, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?)`,
-        )
-        .run(dto.name, slug, dto.description?.trim() || null, now, now);
+    return this.db.transaction(async () => {
+      const result = await this.db.run(
+        `INSERT INTO permission_groups
+           (name, slug, description, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?)`,
+        [dto.name, slug, dto.description?.trim() || null, now, now],
+      );
 
-      const id = Number(result.lastInsertRowid);
-      this.replacePermissions(id, dto.permissions ?? []);
+      const id = result.lastInsertId;
+      await this.replacePermissions(id, dto.permissions ?? []);
       return this.findOneOrFail(id);
     });
   }
 
-  update(id: number, dto: UpdatePermissionGroupDto): PermissionGroup {
-    const existing = this.findOneOrFail(id);
+  async update(
+    id: number,
+    dto: UpdatePermissionGroupDto,
+  ): Promise<PermissionGroup> {
+    const existing = await this.findOneOrFail(id);
     const name = dto.name ?? existing.name;
     const slug =
       dto.slug !== undefined
-        ? this.resolveSlug(dto.slug, name, id)
+        ? await this.resolveSlug(dto.slug, name, id)
         : existing.slug;
 
-    return this.sqlite.transaction(() => {
-      this.sqlite.db
-        .prepare(
-          `UPDATE permission_groups
-              SET name = ?, slug = ?, description = ?, updatedAt = ?
-            WHERE id = ?`,
-        )
-        .run(
+    return this.db.transaction(async () => {
+      await this.db.run(
+        `UPDATE permission_groups
+            SET name = ?, slug = ?, description = ?, updatedAt = ?
+          WHERE id = ?`,
+        [
           name,
           slug,
           dto.description === undefined
@@ -121,43 +122,40 @@ export class PermissionGroupsService implements OnModuleInit {
             : dto.description?.trim() || null,
           new Date().toISOString(),
           id,
-        );
+        ],
+      );
 
       if (dto.permissions !== undefined) {
-        this.replacePermissions(id, dto.permissions);
+        await this.replacePermissions(id, dto.permissions);
       }
       return this.findOneOrFail(id);
     });
   }
 
   /** Xoá nhóm; ON DELETE CASCADE tự dọn quyền và các liên kết với user. */
-  remove(id: number): void {
-    this.findOneOrFail(id);
-    this.sqlite.db
-      .prepare('DELETE FROM permission_groups WHERE id = ?')
-      .run(id);
+  async remove(id: number): Promise<void> {
+    await this.findOneOrFail(id);
+    await this.db.run('DELETE FROM permission_groups WHERE id = ?', [id]);
   }
 
   /** Kiểm tra toàn bộ id có tồn tại, dùng trước khi gán nhóm cho user. */
-  assertAllExist(ids: number[]): void {
+  async assertAllExist(ids: number[]): Promise<void> {
     for (const id of ids) {
-      this.findOneOrFail(id);
+      await this.findOneOrFail(id);
     }
   }
 
-  private hydrate(row: GroupRow): PermissionGroup {
-    const permissions = this.sqlite.db
-      .prepare(
-        `SELECT permission FROM permission_group_permissions
-          WHERE groupId = ? ORDER BY permission`,
-      )
-      .all(row.id) as { permission: string }[];
+  private async hydrate(row: GroupRow): Promise<PermissionGroup> {
+    const permissions = await this.db.all<{ permission: string }>(
+      `SELECT permission FROM permission_group_permissions
+        WHERE groupId = ? ORDER BY permission COLLATE utf8mb4_bin`,
+      [row.id],
+    );
 
-    const members = this.sqlite.db
-      .prepare(
-        'SELECT COUNT(*) AS total FROM user_permission_groups WHERE groupId = ?',
-      )
-      .get(row.id) as { total: number } | undefined;
+    const members = await this.db.get<{ total: number }>(
+      'SELECT COUNT(*) AS total FROM user_permission_groups WHERE groupId = ?',
+      [row.id],
+    );
 
     return {
       ...row,
@@ -167,23 +165,31 @@ export class PermissionGroupsService implements OnModuleInit {
     };
   }
 
-  private replacePermissions(groupId: number, permissions: string[]): void {
-    this.catalog.assertAllExist(permissions);
+  private async replacePermissions(
+    groupId: number,
+    permissions: string[],
+  ): Promise<void> {
+    await this.catalog.assertAllExist(permissions);
 
-    this.sqlite.db
-      .prepare('DELETE FROM permission_group_permissions WHERE groupId = ?')
-      .run(groupId);
-
-    const insert = this.sqlite.db.prepare(
-      `INSERT INTO permission_group_permissions (groupId, permission)
-       VALUES (?, ?)`,
+    await this.db.run(
+      'DELETE FROM permission_group_permissions WHERE groupId = ?',
+      [groupId],
     );
+
     for (const permission of new Set(permissions)) {
-      insert.run(groupId, permission);
+      await this.db.run(
+        `INSERT INTO permission_group_permissions (groupId, permission)
+         VALUES (?, ?)`,
+        [groupId, permission],
+      );
     }
   }
 
-  private resolveSlug(slug: string | undefined, name: string, id?: number) {
+  private async resolveSlug(
+    slug: string | undefined,
+    name: string,
+    id?: number,
+  ): Promise<string> {
     const value = slug?.trim() || slugify(name);
     if (!value) {
       throw new ConflictException(
@@ -191,11 +197,11 @@ export class PermissionGroupsService implements OnModuleInit {
       );
     }
 
-    const clash = this.sqlite.db
-      .prepare(
-        'SELECT id FROM permission_groups WHERE slug = ? AND id IS NOT ?',
-      )
-      .get(value, id ?? null) as { id: number } | undefined;
+    // `<=>` là so sánh an toàn với NULL của MySQL (tương đương `IS` của SQLite).
+    const clash = await this.db.get<{ id: number }>(
+      'SELECT id FROM permission_groups WHERE slug = ? AND NOT (id <=> ?)',
+      [value, id ?? null],
+    );
 
     if (clash) {
       throw new ConflictException(`Slug "${value}" đã được dùng`);

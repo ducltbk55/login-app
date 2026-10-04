@@ -1,17 +1,22 @@
-# Backend — NestJS + SQLite
+# Backend — NestJS + MySQL
 
 API nội bộ lưu người dùng đăng ký qua Google và lịch sử đăng nhập của họ.
 Frontend Next.js (`../frontend`) gọi API này sau khi Google xác thực xong.
 
-Dùng module **`node:sqlite`** có sẵn trong Node.js (>= 22.5) nên không cần cài
-native module (`sqlite3`, `better-sqlite3`) hay chạy migration tool nào.
+Lưu dữ liệu trong **MySQL** (database `business-platform`) qua driver `mysql2`.
+Không dùng ORM hay migration tool: lúc khởi động backend tự tạo database (nếu
+chưa có) và các bảng còn thiếu theo `src/database/schema.ts`.
 
 ## Cấu trúc
 
 | Đường dẫn | Vai trò |
 | --- | --- |
 | `src/main.ts` | Bootstrap: prefix `/api`, `ValidationPipe`, CORS, shutdown hooks |
-| `src/database/sqlite.service.ts` | Mở kết nối SQLite, tạo bảng (migrate) khi khởi động, helper `transaction()` |
+| `src/database/database.service.ts` | Pool MySQL, tạo database/bảng khi khởi động, helper `all/get/run/transaction()` |
+| `src/database/schema.ts` | Lược đồ MySQL (`CREATE TABLE IF NOT EXISTS`) |
+| `src/database/migrations/` | Migration dữ liệu chạy một lần mỗi database (danh mục, tỉnh/thành, phường/xã…) |
+| `scripts/migrate.ts` | Tạo bảng + chạy migration rồi thoát (`npm run migrate`) |
+| `scripts/import-sqlite.ts` | Chép dữ liệu từ file SQLite cũ sang MySQL (`npm run db:import-sqlite`) |
 | `src/users/users.service.ts` | Logic đăng ký / ghi nhận đăng nhập, truy vấn người dùng |
 | `src/users/users.controller.ts` | REST endpoints `/api/users*` |
 | `src/users/user.entity.ts` | Kiểu dữ liệu `User` / `LoginEvent` / `SyncResult` |
@@ -42,11 +47,19 @@ native module (`sqlite3`, `better-sqlite3`) hay chạy migration tool nào.
 PORT=4000
 FRONTEND_ORIGIN=http://localhost:3000
 BACKEND_API_KEY=<khoá nội bộ, trùng với frontend>
-DATABASE_FILE=data/app.db
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=<mật khẩu MySQL>
+DB_NAME=business-platform
+UPLOAD_DIR=data/uploads   # ảnh & tệp đính kèm
 DEV_LOGIN=on      # tuỳ chọn, chỉ dùng khi phát triển — xem mục dưới
 ```
 
 ## Chạy
+
+Cần một MySQL 8 đang chạy; tài khoản trong `DB_USER` phải có quyền tạo database
+(hoặc tạo trước: `CREATE DATABASE ``business-platform`` CHARACTER SET utf8mb4;`).
 
 ```bash
 npm install
@@ -159,12 +172,8 @@ category_details(id INTEGER PK AUTOINCREMENT,
 -- Lúc khởi động, quyền mặc định nào còn thiếu thì được chèn thêm; admin thêm
 -- quyền mới bằng cách thêm chi tiết, tắt quyền thì nó không gán được nữa.
 -- Mã quyền cũ viết thường được migrate thành chữ hoa cho khớp với code.
--- Mọi khoá chính/khoá ngoại đều là INTEGER tự tăng.
--- DB cũ được migrate tự động lúc khởi động, qua hai bước:
---   1) categories: slug/description/sortOrder/isActive -> code/descriptions/"order"/status
---   2) toàn bộ khoá GUID (TEXT) -> INTEGER, GUID của users dời sang cột accountId
--- Khoá ngoại được trỏ lại bằng bảng ánh xạ tạm nên quan hệ cha-con giữ nguyên.
--- Regression test: src/database/sqlite.service.spec.ts
+-- Mọi khoá chính/khoá ngoại đều là INT AUTO_INCREMENT.
+-- Ngày giờ lưu chuỗi ISO 8601 (VARCHAR(30)); collation utf8mb4_unicode_ci.
 
 articles(id INTEGER PK AUTOINCREMENT,
          categoryDetailId INTEGER → category_details(id)   -- chuyên mục
@@ -268,8 +277,7 @@ Vài điểm nữa:
 - `published` mà bỏ trống ngày thì lấy thời điểm hiện tại ("đăng luôn").
 - `readingMinutes` suy ra từ độ dài nội dung (200 từ/phút), không lưu cột.
 - Khoá ngoại tới `category_details` không CASCADE: xoá chuyên mục đang có bài
-  bị chặn bằng 409 kèm thông báo rõ, thay vì để SQLite ném "FOREIGN KEY
-  constraint failed".
+  bị chặn bằng 409 kèm thông báo rõ, thay vì để MySQL ném lỗi khoá ngoại.
 
 Test: `src/articles/articles.service.spec.ts`, `test/articles.e2e-spec.ts`.
 
@@ -306,11 +314,41 @@ npm run set-role -- ban@gmail.com user    # hạ quyền
 ## Kiểm thử
 
 ```bash
-npm test           # unit test UsersService trên file SQLite tạm
+npm test           # unit test, mỗi bộ test dùng một database MySQL tạm (bp_test_*)
 npm run test:e2e   # e2e: health, api key, sync, DEV_LOGIN, bài viết, liên hệ
 ```
 
-## Muốn đổi sang Postgres/MySQL?
+Test kết nối bằng `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD` (biến môi trường, hoặc
+`.env.local`/`.env.test`), tạo database `bp_test_*` riêng và tự xoá khi xong.
 
-Chỉ cần thay `SqliteService` bằng driver/ORM tương ứng và giữ nguyên interface của
-`UsersService` — controller, guard và frontend không phải sửa.
+## Migration khi deploy
+
+Mỗi lần khởi động, backend tạo bảng còn thiếu rồi chạy các migration dữ liệu
+chưa chạy trong `src/database/migrations/index.ts` (ghi lại ở bảng
+`migrations`, mỗi migration một transaction, có `GET_LOCK` chống hai instance
+chạy trùng). Muốn chạy riêng ở bước deploy, trước khi bật server:
+
+```bash
+npm run migrate          # khi dev (ts-node)
+npm run migrate:prod     # sau npm run build: node dist/scripts/migrate.js
+```
+
+Migration hiện có:
+
+| Tên | Nội dung |
+| --- | --- |
+| `2026-10-04-001-categories-from-sqlite` | 6 danh mục xuất từ bản SQLite: quyền (17), chức năng (7), tỉnh/thành phố (34), phường/xã (3321, nhóm theo tỉnh), chuyên mục (4), lĩnh vực sản phẩm (3) |
+
+Migration chỉ **chèn phần còn thiếu** theo `code`, không ghi đè bản ghi admin
+đã sửa. Cần thay đổi dữ liệu thì thêm migration mới vào cuối mảng, đừng sửa
+migration đã deploy. Test mặc định tắt migration (`DB_SKIP_MIGRATIONS=true`)
+để mỗi bộ test bắt đầu từ database trống; xem `src/database/migrations.spec.ts`.
+
+## Chuyển dữ liệu từ SQLite cũ
+
+Bản trước lưu ở `data/app.db`. Chép sang MySQL (giữ nguyên id):
+
+```bash
+npm run db:import-sqlite                 # MySQL phải đang trống
+npm run db:import-sqlite -- --replace    # xoá dữ liệu MySQL hiện có rồi chép
+```

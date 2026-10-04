@@ -1,0 +1,5 @@
+# Script và cấu hình chạy trong Linux/Docker phải giữ LF, kể cả khi checkout trên Windows.
+*.sh text eol=lf
+Makefile text eol=lf
+deploy/** text eol=lf
+**/Dockerfile text eol=lf
