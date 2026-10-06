@@ -6,7 +6,9 @@ import { CategoryDetailsService } from '../categories/category-details.service';
 import { DatabaseModule } from '../database/database.module';
 import { testDatabaseConfig } from '../database/testing';
 import { ProductCategoriesService } from '../products/product-categories.service';
+import { MailService } from '../mail/mail.service';
 import { ProductsService } from '../products/products.service';
+import { OrderMailer } from './order-mailer';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService', () => {
@@ -42,7 +44,14 @@ describe('OrdersService', () => {
         DatabaseModule,
         CategoriesModule,
       ],
-      providers: [OrdersService, ProductsService, ProductCategoriesService],
+      // Không có SMTP_HOST nên MailService ở chế độ tắt — không gửi thật.
+      providers: [
+        OrdersService,
+        OrderMailer,
+        MailService,
+        ProductsService,
+        ProductCategoriesService,
+      ],
     }).compile();
 
     await moduleRef.init();
