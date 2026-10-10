@@ -363,3 +363,24 @@ export async function deleteCandidate(id: string | number): Promise<void> {
 export async function candidateCv(id: string | number): Promise<Response> {
   return requestStream(`/recruitment/candidates/${segment(id)}/cv`);
 }
+
+/** Hôm nay theo lịch Việt Nam, dạng YYYY-MM-DD — so được thẳng với ngày của đợt. */
+export function todayInVietnam(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  }).format(now);
+}
+
+/** Số ngày còn nhận hồ sơ, tính cả hôm nay là 0. Âm = đã quá hạn. */
+export function daysUntil(endDate: string, today = todayInVietnam()): number {
+  const ms = Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`);
+  return Math.round(ms / 86_400_000);
+}
+
+/** "Còn 12 ngày" / "Hạn cuối hôm nay" / "Đã hết hạn". */
+export function deadlineLabel(endDate: string, today = todayInVietnam()): string {
+  const days = daysUntil(endDate, today);
+  if (days < 0) return "Đã hết hạn";
+  if (days === 0) return "Hạn cuối hôm nay";
+  return `Còn ${days} ngày`;
+}

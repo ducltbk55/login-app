@@ -349,3 +349,31 @@ export function CalendarIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function MapPinIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" />
+      <circle cx="12" cy="10" r="2.25" />
+    </Icon>
+  );
+}
+
+export function WalletIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3" />
+      <rect x="4" y="7.5" width="16" height="11.5" rx="2.5" />
+      <path d="M16 13.25h1.5" />
+    </Icon>
+  );
+}
+
+export function LayersIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m12 4 8.5 4.5L12 13 3.5 8.5 12 4Z" />
+      <path d="m3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.5 12 21l8.5-4.5" />
+    </Icon>
+  );
+}

@@ -4,6 +4,7 @@ import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import type { ApplyFormState } from "@/app/(site)/tuyen-dung/[slug]/actions";
+import { SearchableSelect } from "@/components/admin/searchable-select";
 import { formatBytes } from "@/lib/contacts";
 import {
   CV_LABEL,
@@ -204,22 +205,21 @@ export function ApplyForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="apply-experience" className={LABEL}>
-            Kinh nghiệm
-          </label>
-          <select
-            id="apply-experience"
+          <span className={LABEL}>Kinh nghiệm</span>
+          <SearchableSelect
+            variant="site"
             name="experience"
             defaultValue={state.values?.experience ?? ""}
-            className={`${FIELD} cursor-pointer`}
-          >
-            <option value="">— Chọn —</option>
-            {EXPERIENCE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "Không chọn" },
+              ...EXPERIENCE_OPTIONS.map((option) => ({
+                value: option,
+                label: option,
+              })),
+            ]}
+            placeholder="— Chọn —"
+            searchPlaceholder="Tìm…"
+          />
         </div>
         <div>
           <label htmlFor="apply-portfolio" className={LABEL}>

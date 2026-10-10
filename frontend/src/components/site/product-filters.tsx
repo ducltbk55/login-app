@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { SearchableSelect } from "@/components/admin/searchable-select";
 import { formatVndShort } from "@/lib/format";
 import { productsHref, type ProductFilterValues } from "@/lib/product-filters";
 import {
@@ -237,27 +238,25 @@ export function ProductSortSelect({ values }: { values: ProductFilterValues }) {
   const router = useRouter();
 
   return (
-    <label className="flex items-center gap-2 text-sm">
+    <div className="flex items-center gap-2 text-sm">
       <span className="text-black/55">Sắp xếp</span>
-      <select
+      <SearchableSelect
+        variant="site"
+        name="sort"
+        className="w-48"
         value={values.sort}
-        onChange={(event) =>
+        onChange={(sort) =>
           router.push(
-            productsHref({
-              ...values,
-              sort: event.target.value as ProductSort,
-            }),
+            productsHref({ ...values, sort: sort as ProductSort }),
             { scroll: false },
           )
         }
-        className="cursor-pointer rounded-lg border border-black/15 bg-white px-3 py-2 text-sm font-medium outline-none focus:border-gold-500"
-      >
-        {PRODUCT_SORTS.map((sort) => (
-          <option key={sort} value={sort}>
-            {PRODUCT_SORT_LABELS[sort]}
-          </option>
-        ))}
-      </select>
-    </label>
+        options={PRODUCT_SORTS.map((sort) => ({
+          value: sort,
+          label: PRODUCT_SORT_LABELS[sort],
+        }))}
+        searchPlaceholder="Tìm cách sắp xếp…"
+      />
+    </div>
   );
 }

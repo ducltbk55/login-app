@@ -122,6 +122,7 @@ export function ProfileForm({
         <div>
           <span className={LABEL}>Tỉnh / Thành phố *</span>
           <SearchableSelect
+            variant="site"
             name="provinceCode"
             required
             options={toOptions(provinces)}
@@ -137,6 +138,7 @@ export function ProfileForm({
           {/* `key` buộc ô chọn dựng lại khi đổi tỉnh, nếu không nó giữ giá trị cũ */}
           <SearchableSelect
             key={provinceCode}
+            variant="site"
             name="wardCode"
             required
             disabled={!provinceCode || loadingWards}

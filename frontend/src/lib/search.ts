@@ -15,9 +15,17 @@ export function normalizeForSearch(input: string): string {
     .trim();
 }
 
+/**
+ * Khớp khi MỌI từ gõ vào đều có mặt, không cần liền nhau hay đúng thứ tự:
+ * "3 5" khớp "3 – 5 năm", "nang da" khớp "Đà Nẵng". Gõ nguyên cụm vẫn khớp
+ * như trước — tách từ chỉ nới rộng chứ không bớt kết quả nào.
+ */
 export function matchesSearch(needle: string, ...fields: string[]): boolean {
-  const query = normalizeForSearch(needle);
-  if (!query) return true;
+  const words = normalizeForSearch(needle)
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  if (words.length === 0) return true;
 
-  return fields.some((field) => normalizeForSearch(field).includes(query));
+  const haystack = fields.map(normalizeForSearch).join(" ");
+  return words.every((word) => haystack.includes(word));
 }

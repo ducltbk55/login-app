@@ -14,6 +14,36 @@ export type SelectOption = {
 };
 
 /**
+ * Hai bộ màu: `admin` theo token của khu quản trị (đổi theo dark mode),
+ * `site` cho trang ngoài — nền trắng cố định, điểm nhấn vàng kim.
+ */
+const VARIANTS = {
+  admin: {
+    trigger: INPUT,
+    open: "border-brand-500 ring-2 ring-brand-500/25",
+    muted: "text-admin-muted",
+    panel: "border-admin-border bg-admin-surface",
+    divider: "border-admin-border",
+    active: "bg-brand-500/10",
+    selected: "font-semibold text-brand-700 dark:text-brand-300",
+    option: "text-admin-text",
+  },
+  site: {
+    trigger:
+      "w-full rounded-lg border border-black/15 bg-white px-3.5 py-2.5 text-sm " +
+      "text-ink-900 outline-none transition focus-visible:border-gold-500 " +
+      "focus-visible:ring-2 focus-visible:ring-gold-400/30",
+    open: "border-gold-500 ring-2 ring-gold-400/30",
+    muted: "text-black/40",
+    panel: "border-black/10 bg-white text-ink-900",
+    divider: "border-black/10",
+    active: "bg-gold-50",
+    selected: "font-semibold text-gold-800",
+    option: "text-black/80",
+  },
+} as const;
+
+/**
  * Ô chọn có tìm kiếm, thay cho `<select>` gốc.
  *
  * Giá trị nằm ở một `<input>` ẩn mang đúng `name`, nên dùng được cả trong form
@@ -31,6 +61,9 @@ export function SearchableSelect({
   emptyLabel = "Không có lựa chọn nào",
   disabled = false,
   onChange,
+  value: controlled,
+  variant = "admin",
+  className = "",
 }: {
   name: string;
   options: SelectOption[];
@@ -42,8 +75,19 @@ export function SearchableSelect({
   disabled?: boolean;
   /** Dùng khi một ô chọn khác phải nạp lại theo giá trị này (tỉnh → phường). */
   onChange?: (value: string) => void;
+  /**
+   * Truyền vào thì thành ô điều khiển: giá trị do component cha giữ (bộ lọc
+   * áp dụng ngay khi đổi). Không truyền thì tự giữ, khởi đầu từ `defaultValue`.
+   */
+  value?: string;
+  variant?: keyof typeof VARIANTS;
+  /** Class cho khung ngoài, ví dụ độ rộng cố định của ô sắp xếp. */
+  className?: string;
 }) {
-  const [value, setValue] = useState(defaultValue);
+  const [inner, setInner] = useState(defaultValue);
+  const value = controlled ?? inner;
+  const setValue = setInner;
+  const theme = VARIANTS[variant];
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -118,7 +162,11 @@ export function SearchableSelect({
   };
 
   return (
-    <div ref={containerRef} className="relative" onKeyDown={onKeyDown}>
+    <div
+      ref={containerRef}
+      className={`relative ${className}`}
+      onKeyDown={onKeyDown}
+    >
       {/*
         Trường thật của form: giữ giá trị và gánh luôn kiểm tra `required`.
         Cố ý KHÔNG đặt `aria-hidden`: khi validate hỏng trình duyệt sẽ focus vào
@@ -142,33 +190,37 @@ export function SearchableSelect({
         aria-controls={listboxId}
         disabled={disabled}
         onClick={() => (open ? setOpen(false) : openMenu())}
-        className={`${INPUT} flex items-center gap-2 text-left ${
+        className={`${theme.trigger} flex items-center gap-2 text-left ${
           disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
-        } ${open ? "border-brand-500 ring-2 ring-brand-500/25" : ""}`}
+        } ${open ? theme.open : ""}`}
       >
         <span
           className={`min-w-0 flex-1 truncate ${
-            selected ? "" : "text-admin-muted"
+            selected ? "" : theme.muted
           }`}
         >
           {selected ? selected.label : placeholder}
         </span>
         {selected?.hint && (
-          <span className="shrink-0 font-mono text-xs text-admin-muted">
+          <span className={`shrink-0 font-mono text-xs ${theme.muted}`}>
             {selected.hint}
           </span>
         )}
         <ChevronDownIcon
-          className={`size-4 shrink-0 text-admin-muted transition ${
+          className={`size-4 shrink-0 transition ${theme.muted} ${
             open ? "rotate-180" : ""
           }`}
         />
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-admin-border bg-admin-surface shadow-2xl">
-          <div className="relative border-b border-admin-border">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-admin-muted" />
+        <div
+          className={`absolute z-50 mt-1 w-full min-w-48 overflow-hidden rounded-lg border shadow-2xl ${theme.panel}`}
+        >
+          <div className={`relative border-b ${theme.divider}`}>
+            <SearchIcon
+              className={`pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 ${theme.muted}`}
+            />
             <input
               ref={searchRef}
               type="text"
@@ -196,18 +248,16 @@ export function SearchableSelect({
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => choose(option)}
                   className={`flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${
-                    index === activeIndex ? "bg-brand-500/10" : ""
-                  } ${
-                    option.value === value
-                      ? "font-semibold text-brand-700 dark:text-brand-300"
-                      : "text-admin-text"
-                  }`}
+                    index === activeIndex ? theme.active : ""
+                  } ${option.value === value ? theme.selected : theme.option}`}
                 >
                   <span className="min-w-0 flex-1 truncate">
                     {option.label}
                   </span>
                   {option.hint && (
-                    <span className="shrink-0 font-mono text-xs text-admin-muted">
+                    <span
+                      className={`shrink-0 font-mono text-xs ${theme.muted}`}
+                    >
                       {option.hint}
                     </span>
                   )}
@@ -216,7 +266,7 @@ export function SearchableSelect({
             ))}
 
             {visible.length === 0 && (
-              <li className="px-3 py-6 text-center text-sm text-admin-muted">
+              <li className={`px-3 py-6 text-center text-sm ${theme.muted}`}>
                 {options.length === 0 ? emptyLabel : "Không tìm thấy"}
               </li>
             )}
