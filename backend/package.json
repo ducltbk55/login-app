@@ -20,7 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "set-role": "node scripts/set-role.mjs",
     "seed:vn": "ts-node scripts/seed-vn-administrative.ts",
-    "email:preview": "ts-node scripts/preview-order-emails.ts",
+    "email:preview": "ts-node scripts/preview-order-emails.ts && ts-node scripts/preview-candidate-emails.ts",
     "mail:test": "ts-node scripts/send-test-mail.ts",
     "db:import-sqlite": "ts-node scripts/import-sqlite.ts",
     "migrate": "ts-node scripts/migrate.ts",

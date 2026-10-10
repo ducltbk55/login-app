@@ -69,12 +69,12 @@ Chi tiết cấu hình và quy trình: `deploy/README.md`.
 | `DB_USER` / `DB_PASSWORD` | Tài khoản MySQL |
 | `DB_NAME` | Tên database, mặc định `business-platform` |
 | `UPLOAD_DIR` | Thư mục ảnh/tệp đính kèm, mặc định `data/uploads` |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | Máy chủ gửi email đơn hàng. Trống `SMTP_HOST` = tắt gửi mail |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | Máy chủ gửi email đơn hàng và email ứng viên. Trống `SMTP_HOST` = tắt gửi mail |
 | `SMTP_USER` / `SMTP_PASSWORD` | Tài khoản SMTP (Gmail: dùng App Password) |
 | `MAIL_FROM` / `MAIL_REPLY_TO` | Người gửi hiển thị / địa chỉ nhận khi khách bấm Trả lời |
 
-Kiểm tra SMTP: `npm --prefix backend run mail:test -- ban@gmail.com`. Xem trước các mẫu email:
-`npm --prefix backend run email:preview` (ghi ra `backend/data/email-previews/`).
+Kiểm tra SMTP: `npm --prefix backend run mail:test -- ban@gmail.com`. Xem trước các mẫu email
+(đơn hàng và ứng viên): `npm --prefix backend run email:preview` (ghi ra `backend/data/email-previews/`).
 
 ## Tạo Google OAuth Client
 

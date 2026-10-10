@@ -53,7 +53,7 @@ services:
       DB_NAME: ${DB_NAME:-business-platform}
       UPLOAD_DIR: /app/data/uploads
       TZ: ${TZ:-Asia/Ho_Chi_Minh}
-      # Email đơn hàng — SMTP_HOST trống thì tắt.
+      # Email đơn hàng và email ứng viên — SMTP_HOST trống thì tắt.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-}

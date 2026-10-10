@@ -3,10 +3,7 @@
  *
  * Hàm thuần: nhận đơn + loại email, trả về `{ subject, preheader, html, text }`.
  * Không biết gì về SMTP — nơi gửi (nodemailer, SES, …) chỉ việc lấy kết quả.
- *
- * HTML viết theo kiểu email: bố cục bằng `<table>`, style inline, rộng tối đa
- * 600px, không dùng flex/grid hay CSS ngoài — Gmail và Outlook bỏ hết những
- * thứ đó. Mọi giá trị đến từ khách/admin đều đi qua `escapeHtml`.
+ * Khung email và các khối chung nằm ở `email-layout.ts`.
  */
 import type {
   Order,
@@ -14,7 +11,26 @@ import type {
   PaymentMethod,
   PaymentStatus,
 } from '../orders/order.entity';
+import {
+  C,
+  FONT,
+  absoluteUrl,
+  button,
+  escapeHtml,
+  formatDateTime,
+  heading,
+  htmlToText,
+  multiline,
+  noteBox,
+  renderShell,
+  sectionTitle,
+  textFooter,
+  type RenderedEmail,
+  type Tone,
+} from './email-layout';
 import type { MailBrand } from './mail-brand';
+
+export { escapeHtml, type RenderedEmail };
 
 export const ORDER_EMAIL_KINDS = [
   'placed',
@@ -26,14 +42,6 @@ export const ORDER_EMAIL_KINDS = [
   'refunded',
 ] as const;
 export type OrderEmailKind = (typeof ORDER_EMAIL_KINDS)[number];
-
-export type RenderedEmail = {
-  subject: string;
-  /** Dòng xem trước hiện cạnh tiêu đề trong hộp thư. */
-  preheader: string;
-  html: string;
-  text: string;
-};
 
 export type OrderEmailOptions = {
   /**
@@ -63,22 +71,7 @@ export function orderEmailKindFor(
   return null;
 }
 
-/* ───────────────────────────── Bảng màu ───────────────────────────── */
-
-const C = {
-  page: '#eef2f8',
-  card: '#ffffff',
-  soft: '#f6f8fc',
-  border: '#e3e9f3',
-  text: '#0e1b30',
-  muted: '#5a6b88',
-  faint: '#8c9ab3',
-  ink: '#0b0b0d',
-  gold: '#ddae33',
-  brand: '#1a59db',
-} as const;
-
-type Tone = { accent: string; tint: string; icon: string };
+/* ───────────────────────────── Màu theo loại ───────────────────────────── */
 
 const TONES = {
   amber: { accent: '#b7791f', tint: '#fdf6e7', icon: '🧾' },
@@ -96,47 +89,8 @@ const VND = new Intl.NumberFormat('vi-VN', {
   currency: 'VND',
   maximumFractionDigits: 0,
 });
-const DATE_TIME = new Intl.DateTimeFormat('vi-VN', {
-  timeZone: 'Asia/Ho_Chi_Minh',
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-});
 
 export const formatVnd = (value: number) => VND.format(value);
-const formatDateTime = (iso: string) => DATE_TIME.format(new Date(iso));
-
-export function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/** Ngược lại của `escapeHtml` sau khi bỏ thẻ — cho preheader và bản chữ thuần. */
-function htmlToText(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, '')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&');
-}
-
-/** Escape + giữ xuống dòng của ghi chú nhiều dòng. */
-const multiline = (value: string) =>
-  escapeHtml(value).replace(/\r?\n/g, '<br>');
-
-/** Ảnh/link lưu dạng `/media/...` phải thành URL tuyệt đối thì hộp thư mới tải được. */
-function absoluteUrl(brand: MailBrand, path: string): string {
-  return /^https?:\/\//i.test(path) ? path : `${brand.siteUrl}${path}`;
-}
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cod: 'Thanh toán khi nhận hàng (COD)',
@@ -246,9 +200,6 @@ function copyFor(kind: OrderEmailKind, order: Order): Copy {
 
 /* ─────────────────────────────── Các khối ─────────────────────────────── */
 
-const FONT =
-  "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
-
 const STEPS: { status: OrderStatus; label: string }[] = [
   { status: 'pending', label: 'Đặt hàng' },
   { status: 'confirmed', label: 'Xác nhận' },
@@ -291,22 +242,6 @@ function progress(order: Order, tone: Tone): string {
     <tr><td style="padding:4px 32px 24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${cells}</tr></table>
     </td></tr>`;
-}
-
-function noteBox(label: string, note: string, tone: Tone): string {
-  return `
-    <tr><td style="padding:0 32px 24px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${tone.tint};border-left:4px solid ${tone.accent};border-radius:6px;">
-        <tr><td style="padding:14px 16px;${FONT}">
-          <div style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${tone.accent};">${escapeHtml(label)}</div>
-          <div style="padding-top:4px;font-size:14px;line-height:21px;color:${C.text};">${multiline(note)}</div>
-        </td></tr>
-      </table>
-    </td></tr>`;
-}
-
-function sectionTitle(text: string): string {
-  return `<div style="padding-bottom:10px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${C.muted};${FONT}">${text}</div>`;
 }
 
 function itemsTable(order: Order, brand: MailBrand): string {
@@ -432,17 +367,6 @@ function bankBox(order: Order, brand: MailBrand): string {
     </td></tr>`;
 }
 
-function button(href: string, label: string, color: string): string {
-  return `
-    <tr><td align="center" style="padding:24px 32px 32px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td align="center" bgcolor="${color}" style="border-radius:8px;">
-          <a href="${escapeHtml(href)}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;${FONT}">${label}</a>
-        </td>
-      </tr></table>
-    </td></tr>`;
-}
-
 /* ─────────────────────────────── Ghép lại ─────────────────────────────── */
 
 export function renderOrderEmail(
@@ -463,77 +387,21 @@ export function renderOrderEmail(
     ? { href: `${brand.siteUrl}/dashboard`, label: 'Xem chi tiết đơn hàng' }
     : { href: `${brand.siteUrl}/lien-he`, label: 'Liên hệ hỗ trợ' };
 
-  const html = `<!DOCTYPE html>
-<html lang="vi" xmlns="http://www.w3.org/1999/xhtml">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="x-apple-disable-message-reformatting">
-<meta name="color-scheme" content="light">
-<meta name="supported-color-schemes" content="light">
-<title>${escapeHtml(subject)}</title>
-<style>
-  @media (max-width:620px){
-    .container{width:100%!important}
-    .px{padding-left:20px!important;padding-right:20px!important}
-    .stack{display:block!important;width:100%!important;box-sizing:border-box}
-  }
-</style>
-</head>
-<body style="margin:0;padding:0;background:${C.page};-webkit-text-size-adjust:100%;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(preheader)}${'&#8203;&nbsp;'.repeat(40)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.page};">
-<tr><td align="center" style="padding:24px 12px;">
-  <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;">
-
-    <!-- Header -->
-    <tr><td style="background:${C.ink};border-radius:14px 14px 0 0;padding:18px 32px;" class="px">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td valign="middle" width="44"><a href="${escapeHtml(brand.siteUrl)}"><img src="${escapeHtml(absoluteUrl(brand, brand.logoPath))}" width="40" height="40" alt="${escapeHtml(brand.shortName)}" style="display:block;width:40px;height:40px;border:0;"></a></td>
-        <td valign="middle" style="padding-left:10px;${FONT}">
-          <div style="font-size:16px;font-weight:800;letter-spacing:.06em;color:${C.gold};">${escapeHtml(brand.shortName)}</div>
-          <div style="font-size:11px;color:#9a9aa5;">${escapeHtml(brand.companyName)}</div>
-        </td>
-        <td valign="middle" align="right" style="font-size:12px;color:#9a9aa5;${FONT}">Đơn <span style="color:#ffffff;font-weight:700;font-family:Consolas,Menlo,monospace;">${escapeHtml(order.code)}</span></td>
-      </tr></table>
-    </td></tr>
-
-    <!-- Thân -->
-    <tr><td style="background:${C.card};border-top:4px solid ${tone.accent};">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr><td class="px" style="padding:32px 32px 20px;${FONT}">
-          <div style="display:inline-block;padding:4px 10px;border-radius:999px;background:${tone.tint};color:${tone.accent};font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">${tone.icon}&nbsp; ${escapeHtml(copy.eyebrow)}</div>
-          <h1 style="margin:14px 0 10px;font-size:24px;line-height:31px;font-weight:800;color:${C.text};">${escapeHtml(copy.title)}</h1>
-          <p style="margin:0;font-size:15px;line-height:23px;color:${C.muted};">${copy.intro}</p>
-        </td></tr>
+  const html = renderShell({
+    brand,
+    subject,
+    preheader,
+    tone,
+    headerRight: `Đơn <span style="color:#ffffff;font-weight:700;font-family:Consolas,Menlo,monospace;">${escapeHtml(order.code)}</span>`,
+    body: `${heading(tone, copy.eyebrow, copy.title, copy.intro)}
         ${progress(order, tone)}
         ${note ? noteBox(copy.noteLabel, note, tone) : ''}
         ${needsBankTransfer(order) && kind !== 'payment_received' ? bankBox(order, brand) : ''}
         ${itemsTable(order, brand)}
         ${infoGrid(order)}
-        ${button(cta.href, cta.label, C.brand)}
-      </table>
-    </td></tr>
-
-    <!-- Footer -->
-    <tr><td class="px" style="background:${C.soft};border-top:1px solid ${C.border};border-radius:0 0 14px 14px;padding:22px 32px;${FONT}">
-      <div style="font-size:13px;line-height:20px;color:${C.muted};">
-        Cần hỗ trợ? Gọi <a href="tel:${escapeHtml(brand.phone.replace(/\s/g, ''))}" style="color:${C.brand};text-decoration:none;font-weight:600;">${escapeHtml(brand.phone)}</a>
-        hoặc email <a href="mailto:${escapeHtml(brand.email)}" style="color:${C.brand};text-decoration:none;font-weight:600;">${escapeHtml(brand.email)}</a>
-        <br>${escapeHtml(brand.workingHours)}
-      </div>
-      <div style="padding-top:12px;font-size:12px;line-height:18px;color:${C.faint};">
-        <strong style="color:${C.muted};">${escapeHtml(brand.companyName)}</strong><br>
-        ${escapeHtml(brand.address)}<br>
-        Bạn nhận email này vì đã đặt hàng tại <a href="${escapeHtml(brand.siteUrl)}" style="color:${C.faint};">${escapeHtml(brand.siteUrl.replace(/^https?:\/\//, ''))}</a>.
-      </div>
-    </td></tr>
-
-  </table>
-</td></tr>
-</table>
-</body>
-</html>`;
+        ${button(cta.href, cta.label, C.brand)}`,
+    reason: 'Bạn nhận email này vì đã đặt hàng tại',
+  });
 
   return {
     subject,
@@ -596,16 +464,7 @@ function renderText(
   );
   if (order.note) lines.push(`  Ghi chú:    ${order.note}`);
 
-  lines.push(
-    '',
-    `${cta.label}: ${cta.href}`,
-    '',
-    '—',
-    brand.companyName,
-    brand.address,
-    `Hotline: ${brand.phone} · Email: ${brand.email}`,
-    brand.workingHours,
-  );
+  lines.push('', `${cta.label}: ${cta.href}`, '', ...textFooter(brand));
 
   return lines.join('\n');
 }

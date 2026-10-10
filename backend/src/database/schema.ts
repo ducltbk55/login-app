@@ -269,4 +269,94 @@ export const SCHEMA: readonly string[] = [
     -- Trang quản trị mặc định lọc theo trạng thái rồi sắp theo thời gian gửi.
     KEY idx_contacts_status_createdAt (status, createdAt)
   ) ${TABLE_OPTIONS}`,
+
+  // Tuyển dụng: đợt → vị trí → ứng viên (xem recruitment/recruitment.entity.ts).
+  // Ngày mở/đóng đợt là ngày lịch YYYY-MM-DD, không có giờ.
+  `CREATE TABLE IF NOT EXISTS recruitment_batches (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    startDate VARCHAR(10) NOT NULL,
+    endDate VARCHAR(10) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'draft',
+    createdAt VARCHAR(30) NOT NULL,
+    updatedAt VARCHAR(30) NOT NULL,
+    KEY idx_recruitment_batches_status (status),
+    CONSTRAINT chk_recruitment_batches_dates CHECK (startDate <= endDate)
+  ) ${TABLE_OPTIONS}`,
+
+  // Không ON DELETE CASCADE ở cả hai tầng: xoá đợt hay vị trí không được kéo
+  // theo hồ sơ ứng viên — service chặn xoá khi còn dữ liệu con.
+  `CREATE TABLE IF NOT EXISTS recruitment_jobs (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    batchId INT NOT NULL,
+    slug VARCHAR(191) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    department VARCHAR(255) NULL,
+    level VARCHAR(100) NOT NULL,
+    employmentType VARCHAR(100) NOT NULL,
+    location VARCHAR(255) NOT NULL,
+    salary VARCHAR(255) NULL,
+    openings INT NOT NULL DEFAULT 1,
+    summary TEXT NULL,
+    requirements TEXT NULL,
+    description LONGTEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    createdAt VARCHAR(30) NOT NULL,
+    updatedAt VARCHAR(30) NOT NULL,
+    UNIQUE KEY uq_recruitment_jobs_slug (slug),
+    KEY idx_recruitment_jobs_batchId (batchId),
+    CONSTRAINT fk_recruitment_jobs_batch FOREIGN KEY (batchId)
+      REFERENCES recruitment_batches(id),
+    CONSTRAINT chk_recruitment_jobs_openings CHECK (openings > 0)
+  ) ${TABLE_OPTIONS}`,
+
+  // Hồ sơ ứng viên. CV nằm trên đĩa (`<UPLOAD_DIR>/candidates`), giống đính
+  // kèm liên hệ: cvFile = tên hệ thống sinh, cvName = tên gốc chỉ để hiển thị.
+  // `batchId` là đợt LÚC NỘP, giữ nguyên dù vị trí sau này bị chuyển đợt.
+  `CREATE TABLE IF NOT EXISTS candidates (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    jobId INT NOT NULL,
+    batchId INT NOT NULL,
+    fullName VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    phone VARCHAR(30) NOT NULL,
+    experience VARCHAR(100) NULL,
+    portfolioUrl VARCHAR(500) NULL,
+    coverLetter TEXT NULL,
+    cvName VARCHAR(500) NOT NULL,
+    cvFile VARCHAR(255) NOT NULL,
+    cvMime VARCHAR(100) NOT NULL,
+    cvSize INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'new',
+    interviewAt VARCHAR(30) NULL,
+    note TEXT NULL,
+    handledBy VARCHAR(255) NULL,
+    handledAt VARCHAR(30) NULL,
+    createdAt VARCHAR(30) NOT NULL,
+    updatedAt VARCHAR(30) NOT NULL,
+    KEY idx_candidates_jobId (jobId),
+    KEY idx_candidates_batchId (batchId),
+    KEY idx_candidates_status_createdAt (status, createdAt),
+    -- Service tra index này để chặn một email nộp trùng vào cùng vị trí.
+    KEY idx_candidates_job_email (jobId, email),
+    CONSTRAINT fk_candidates_job FOREIGN KEY (jobId)
+      REFERENCES recruitment_jobs(id),
+    CONSTRAINT fk_candidates_batch FOREIGN KEY (batchId)
+      REFERENCES recruitment_batches(id)
+  ) ${TABLE_OPTIONS}`,
+
+  // Nhật ký hồ sơ chỉ thêm, không sửa — như lịch sử đơn hàng.
+  `CREATE TABLE IF NOT EXISTS candidate_events (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    candidateId INT NOT NULL,
+    type VARCHAR(30) NOT NULL,
+    fromValue VARCHAR(255) NULL,
+    toValue VARCHAR(255) NULL,
+    actor VARCHAR(255) NULL,
+    createdAt VARCHAR(30) NOT NULL,
+    KEY idx_candidate_events_candidateId (candidateId),
+    CONSTRAINT fk_candidate_events_candidate FOREIGN KEY (candidateId)
+      REFERENCES candidates(id) ON DELETE CASCADE
+  ) ${TABLE_OPTIONS}`,
 ];

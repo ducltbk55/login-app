@@ -13,7 +13,8 @@ import {
 } from "@/lib/company";
 import { ArticleCard } from "@/components/site/article-card";
 import { listArticles } from "@/lib/articles";
-import { JOBS, SERVICES } from "@/lib/site-content";
+import { listJobs } from "@/lib/recruitment";
+import { SERVICES } from "@/lib/site-content";
 
 export const metadata = {
   title: "Trang chủ",
@@ -22,13 +23,19 @@ export const metadata = {
 
 export default async function HomePage() {
   // Ba bài mới nhất đang lên sóng; trang vẫn dựng được nếu chưa có bài nào.
-  const latestNews = (await listArticles({ live: true, pageSize: 3 })).items;
+  const [latestNews, openJobs] = await Promise.all([
+    listArticles({ live: true, pageSize: 3 }).then((page) => page.items),
+    listJobs({ accepting: true, pageSize: 200 }).then((page) => page.items),
+  ]);
 
   const stats = [
     { value: `${COMPANY_PROFILE.foundedYear}`, label: "Năm thành lập" },
     { value: `${yearsInBusiness()}+`, label: "Năm kinh nghiệm" },
     { value: `${SERVICES.length}`, label: "Nhóm dịch vụ" },
-    { value: `${JOBS.reduce((n, j) => n + j.openings, 0)}`, label: "Vị trí đang tuyển" },
+    {
+      value: `${openJobs.reduce((n, job) => n + job.openings, 0)}`,
+      label: "Vị trí đang tuyển",
+    },
   ];
 
   return (
@@ -47,7 +54,7 @@ export default async function HomePage() {
         <div className="relative mx-auto grid w-full max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8 lg:py-28">
           <div className="space-y-7">
             <span className="inline-flex items-center gap-2 rounded-full border border-gold-400/40 px-3 py-1 text-xs font-medium tracking-wide text-gold-300 uppercase">
-              {COMPANY_PROFILE.industry} · Đà Nẵng
+              {COMPANY_PROFILE.industry}
             </span>
 
             <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">

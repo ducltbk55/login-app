@@ -8,7 +8,9 @@ import type { AdminMenuItem, AdminSectionCode } from "@/lib/access";
 
 import {
   BoxIcon,
+  BriefcaseIcon,
   DashboardIcon,
+  IdCardIcon,
   MailIcon,
   NewspaperIcon,
   ReceiptIcon,
@@ -34,6 +36,8 @@ const ICONS: Record<AdminSectionCode, Icon> = {
   ORDERS: ReceiptIcon,
   CATEGORIES: TagIcon,
   CONTACTS: MailIcon,
+  RECRUITMENT: BriefcaseIcon,
+  CANDIDATES: IdCardIcon,
   "PERMISSION-GROUPS": ShieldIcon,
 };
 
