@@ -97,6 +97,13 @@ export function decodeUploadName(raw: string): string {
   return decoded.includes('\ufffd') ? raw : decoded;
 }
 
+/** Tên file tiếng Việt cần cả dạng ASCII dự phòng lẫn dạng RFC 5987. */
+export function contentDisposition(name: string, inline: boolean): string {
+  const ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
+  const encoded = encodeURIComponent(name);
+  return `${inline ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
 /**
  * Tên gốc dùng để hiển thị và đặt trong Content-Disposition.
  * Bỏ ký tự điều khiển, dấu nháy kép và ký tự tách đường dẫn.

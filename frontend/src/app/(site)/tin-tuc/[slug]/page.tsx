@@ -66,7 +66,7 @@ export default async function ArticlePage(
   return (
     <>
       <section className="bg-ink-900 text-white">
-        <div className="mx-auto w-full max-w-3xl px-4 py-14 sm:px-6 lg:py-20">
+        <div className="mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
           <Link
             href={`/tin-tuc?chuyen-muc=${article.categoryDetailId}`}
             className="text-xs font-semibold tracking-wider text-gold-300 uppercase transition hover:text-gold-200"
@@ -91,7 +91,7 @@ export default async function ArticlePage(
         </div>
       </section>
 
-      <article className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-6">
+      <article className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         {article.coverImage && (
           // Ảnh bìa là URL tuỳ ý do admin nhập nên dùng thẻ img thường.
           // Khung cao cố định, ảnh cắt vừa khung: ảnh dọc hay ảnh quá khổ
@@ -100,7 +100,7 @@ export default async function ArticlePage(
           <img
             src={article.coverImage}
             alt=""
-            className="mb-10 h-60 w-full rounded-2xl border border-black/10 object-cover sm:h-96"
+            className="mb-10 h-60 w-full rounded-2xl border border-black/10 object-cover sm:h-96 lg:h-[32rem]"
           />
         )}
 

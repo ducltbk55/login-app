@@ -10,6 +10,7 @@ import { HealthModule } from './health/health.module';
 import { OrdersModule } from './orders/orders.module';
 import { PermissionGroupsModule } from './permission-groups/permission-groups.module';
 import { ProductsModule } from './products/products.module';
+import { RecruitmentModule } from './recruitment/recruitment.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -26,6 +27,7 @@ import { UsersModule } from './users/users.module';
     ProductsModule,
     OrdersModule,
     ContactsModule,
+    RecruitmentModule,
     HealthModule,
     DevLoginModule,
   ],

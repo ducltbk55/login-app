@@ -17,12 +17,12 @@ export const COMPANY_PROFILE = {
    * Địa chỉ tạm, dùng tên phường có thật sau sắp xếp đơn vị hành chính
    * 01/07/2025 (Đà Nẵng không còn cấp quận).
    */
-  address: "Tầng 7, Toà nhà Vĩnh Trung Plaza, 255 Hùng Vương",
-  ward: "Phường Hải Châu",
-  city: "Thành phố Đà Nẵng",
+  address: "Xóm Đồng Văn",
+  ward: "Xã Tiên Đồng",
+  city: "Tỉnh Nghệ An",
   email: "lienhe@uyvuict.vn",
-  phone: "0236 3 888 999",
-  taxCode: "0402xxxxxx",
+  phone: "0982190892",
+  taxCode: "040092043696",
   workingHours: "Thứ 2 – Thứ 6, 08:00 – 17:30",
 } as const;
 

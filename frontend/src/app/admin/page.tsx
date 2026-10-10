@@ -4,6 +4,7 @@ import {
   ChevronRightIcon,
   ClockIcon,
   DashboardIcon,
+  IdCardIcon,
   LockIcon,
   ShieldIcon,
   TagIcon,
@@ -14,6 +15,7 @@ import { requireAdminArea } from "@/lib/admin";
 import { listCategories } from "@/lib/categories";
 import { formatDateTime } from "@/lib/format";
 import { listFunctions, listPermissionGroups } from "@/lib/permission-groups";
+import { getCandidateStats } from "@/lib/recruitment";
 import { CARD } from "@/lib/styles";
 import { getUserStats, listUsers } from "@/lib/users";
 
@@ -38,15 +40,15 @@ export default async function AdminOverviewPage(props: PageProps<"/admin">) {
   const canUsers = allowed("USERS.READ");
 
   // Chỉ đọc số liệu của mục người dùng được xem.
-  const [stats, groups, categories, recentUsers, functions] = await Promise.all(
-    [
+  const [stats, groups, categories, recentUsers, functions, candidates] =
+    await Promise.all([
       canUsers ? getUserStats() : null,
       allowed("PERMISSION-GROUPS.READ") ? listPermissionGroups() : null,
       allowed("CATEGORIES.READ") ? listCategories() : null,
       canUsers ? listUsers() : null,
       listFunctions().catch(() => null),
-    ],
-  );
+      allowed("CANDIDATES.READ") ? getCandidateStats() : null,
+    ]);
   const menu = buildAdminMenu(user, functions);
   const deniedText = deniedMessage(
     typeof denied === "string" ? denied : undefined,
@@ -96,6 +98,18 @@ export default async function AdminOverviewPage(props: PageProps<"/admin">) {
             href: "/admin/categories",
             icon: TagIcon,
             tone: TONES.brand,
+          },
+        ]
+      : []),
+    ...(candidates
+      ? [
+          {
+            label: "Hồ sơ ứng viên mới",
+            value: candidates.pending,
+            href: "/admin/candidates?status=new",
+            icon: IdCardIcon,
+            // Còn hồ sơ chưa xem thì nhấn màu, như tài khoản chờ duyệt.
+            tone: candidates.pending > 0 ? TONES.warning : TONES.brand,
           },
         ]
       : []),

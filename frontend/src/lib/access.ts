@@ -23,7 +23,11 @@ export type Permission =
   | "PRODUCTS.PUBLISH"
   | "ORDERS.READ"
   | "ORDERS.WRITE"
-  | "ORDERS.PAYMENT";
+  | "ORDERS.PAYMENT"
+  | "RECRUITMENT.READ"
+  | "RECRUITMENT.WRITE"
+  | "CANDIDATES.READ"
+  | "CANDIDATES.WRITE";
 
 /** Phần của bản ghi người dùng mà việc phân quyền cần tới. */
 export type AccessSubject = {
@@ -65,6 +69,8 @@ export const ADMIN_SECTIONS = [
   { code: "ORDERS", href: "/admin/orders", label: "Đơn hàng" },
   { code: "CATEGORIES", href: "/admin/categories", label: "Danh mục" },
   { code: "CONTACTS", href: "/admin/contacts", label: "Liên hệ" },
+  { code: "RECRUITMENT", href: "/admin/recruitment", label: "Tuyển dụng" },
+  { code: "CANDIDATES", href: "/admin/candidates", label: "Ứng viên" },
   {
     code: "PERMISSION-GROUPS",
     href: "/admin/permission-groups",

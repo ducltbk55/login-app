@@ -24,6 +24,7 @@ import { createReadStream, statSync } from 'node:fs';
 import { ApiKeyGuard } from '../common/api-key.guard';
 import { paginate, type Paginated } from '../common/pagination';
 import {
+  contentDisposition,
   isAllowedMime,
   isInlineSafe,
   ALLOWED_EXTENSIONS,
@@ -62,13 +63,6 @@ const ATTACHMENT_OPTIONS = {
     cb(null, true);
   },
 };
-
-/** Tên file tiếng Việt cần cả dạng ASCII dự phòng lẫn dạng RFC 5987. */
-function contentDisposition(name: string, inline: boolean): string {
-  const ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
-  const encoded = encodeURIComponent(name);
-  return `${inline ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
-}
 
 @Controller('contacts')
 @UseGuards(ApiKeyGuard)

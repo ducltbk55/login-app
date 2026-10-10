@@ -33,6 +33,8 @@ export const FUNCTION_SEEDS: FunctionSeed[] = [
   { code: 'CONTACTS', label: 'Liên hệ' },
   { code: 'PRODUCTS', label: 'Sản phẩm' },
   { code: 'ORDERS', label: 'Đơn hàng' },
+  { code: 'RECRUITMENT', label: 'Tuyển dụng' },
+  { code: 'CANDIDATES', label: 'Ứng viên' },
 ];
 
 export type PermissionSeed = {
@@ -129,6 +131,26 @@ export const PERMISSION_SEEDS: PermissionSeed[] = [
     code: 'ORDERS.PAYMENT',
     label: 'Cập nhật thanh toán đơn hàng',
     functionCode: 'ORDERS',
+  },
+  {
+    code: 'RECRUITMENT.READ',
+    label: 'Xem đợt tuyển dụng và vị trí',
+    functionCode: 'RECRUITMENT',
+  },
+  {
+    code: 'RECRUITMENT.WRITE',
+    label: 'Thêm / sửa / xoá đợt tuyển dụng và vị trí',
+    functionCode: 'RECRUITMENT',
+  },
+  {
+    code: 'CANDIDATES.READ',
+    label: 'Xem hồ sơ ứng viên và CV',
+    functionCode: 'CANDIDATES',
+  },
+  {
+    code: 'CANDIDATES.WRITE',
+    label: 'Xử lý hồ sơ ứng viên (trạng thái, lịch phỏng vấn, ghi chú, xoá)',
+    functionCode: 'CANDIDATES',
   },
 ];
 

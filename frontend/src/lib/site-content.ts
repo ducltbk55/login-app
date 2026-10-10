@@ -1,9 +1,8 @@
 /**
  * Nội dung tĩnh của trang giới thiệu công ty.
  *
- * Cố tình để ở một chỗ duy nhất, không nhúng thẳng vào JSX: khi nào cần đưa
- * tin tức / tuyển dụng vào CSDL thì chỉ việc thay các hàm đọc ở đây, phần
- * giao diện giữ nguyên.
+ * Cố tình để ở một chỗ duy nhất, không nhúng thẳng vào JSX. Tin tức và tuyển
+ * dụng đã chuyển vào CSDL; phần còn lại vẫn là nội dung tĩnh.
  */
 
 export type Service = {
@@ -62,76 +61,7 @@ export const SERVICES: Service[] = [
 
 /* Tin bài giờ nằm trong DB — xem lib/articles.ts và bảng `articles`. */
 
-export type JobOpening = {
-  slug: string;
-  title: string;
-  level: string;
-  type: string;
-  location: string;
-  salary: string;
-  requirements: string[];
-  openings: number;
-};
-
-/** Dữ liệu mẫu — thay bằng truy vấn CSDL khi có phân hệ tuyển dụng. */
-export const JOBS: JobOpening[] = [
-  {
-    slug: "lap-trinh-vien-fullstack",
-    title: "Lập trình viên Fullstack (Next.js / NestJS)",
-    level: "Middle",
-    type: "Toàn thời gian",
-    location: "Đà Nẵng",
-    salary: "18 – 30 triệu",
-    openings: 2,
-    requirements: [
-      "2 năm kinh nghiệm với TypeScript, React hoặc Next.js",
-      "Hiểu REST API, cơ sở dữ liệu quan hệ",
-      "Biết viết test và đọc được code của người khác",
-    ],
-  },
-  {
-    slug: "ky-su-devops",
-    title: "Kỹ sư DevOps",
-    level: "Middle – Senior",
-    type: "Toàn thời gian",
-    location: "Đà Nẵng",
-    salary: "20 – 35 triệu",
-    openings: 1,
-    requirements: [
-      "Thành thạo Linux, Docker, CI/CD",
-      "Kinh nghiệm giám sát và xử lý sự cố hệ thống",
-      "Ưu tiên có chứng chỉ cloud",
-    ],
-  },
-  {
-    slug: "chuyen-vien-phan-tich-nghiep-vu",
-    title: "Chuyên viên phân tích nghiệp vụ (BA)",
-    level: "Junior – Middle",
-    type: "Toàn thời gian",
-    location: "Đà Nẵng",
-    salary: "Thoả thuận",
-    openings: 1,
-    requirements: [
-      "Khả năng phỏng vấn khách hàng và viết tài liệu rõ ràng",
-      "Vẽ được sơ đồ quy trình, wireframe",
-      "Tiếng Anh đọc hiểu tài liệu kỹ thuật",
-    ],
-  },
-  {
-    slug: "thuc-tap-sinh-lap-trinh",
-    title: "Thực tập sinh lập trình",
-    level: "Internship",
-    type: "Thực tập 3 – 6 tháng",
-    location: "Đà Nẵng",
-    salary: "Hỗ trợ 3 – 5 triệu",
-    openings: 4,
-    requirements: [
-      "Sinh viên năm 3, năm 4 ngành CNTT",
-      "Nắm cơ bản một ngôn ngữ lập trình",
-      "Chủ động học hỏi, làm việc nhóm tốt",
-    ],
-  },
-];
+/* Tuyển dụng giờ nằm trong DB — xem lib/recruitment.ts và các bảng recruitment_*. */
 
 export const CORE_VALUES = [
   {

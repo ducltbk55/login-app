@@ -27,6 +27,7 @@ import {
   type PaymentMethod,
   type PaymentStatus,
 } from './order.entity';
+import { OrderMailer } from './order-mailer';
 
 type Id = number;
 
@@ -119,7 +120,10 @@ function toEvent(row: EventRow): OrderEvent {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly mailer: OrderMailer,
+  ) {}
 
   private toOrder(row: OrderRow, items: OrderItem[]): Order {
     return {
@@ -280,7 +284,7 @@ export class OrdersService {
    * duyệt gửi lên.
    */
   async create(dto: CreateOrderDto): Promise<OrderDetail> {
-    return this.db.transaction(async () => {
+    const order = await this.db.transaction(async () => {
       // Cùng một sản phẩm xuất hiện hai lần thì gộp số lượng.
       const quantities = new Map<number, number>();
       for (const line of dto.items) {
@@ -385,13 +389,18 @@ export class OrdersService {
       );
       return this.findOneOrFail(orderId);
     });
+
+    // Gửi sau khi commit; không chờ — SMTP chậm không được làm chậm khách.
+    void this.mailer.notify(order, { type: 'created' });
+    return order;
   }
 
   async updateStatus(
     id: number,
     dto: UpdateOrderStatusDto,
   ): Promise<OrderDetail> {
-    return this.db.transaction(async () => {
+    let changed = false;
+    const order = await this.db.transaction(async () => {
       const order = await this.findOneOrFail(id);
       if (order.status === dto.status) return order;
 
@@ -417,15 +426,26 @@ export class OrdersService {
         dto.actor ?? null,
       );
 
+      changed = true;
       return this.findOneOrFail(id);
     });
+
+    if (changed) {
+      void this.mailer.notify(
+        order,
+        { type: 'status', to: dto.status },
+        dto.note,
+      );
+    }
+    return order;
   }
 
   async updatePayment(
     id: number,
     dto: UpdatePaymentStatusDto,
   ): Promise<OrderDetail> {
-    return this.db.transaction(async () => {
+    let changed = false;
+    const order = await this.db.transaction(async () => {
       const order = await this.findOneOrFail(id);
       if (order.paymentStatus === dto.paymentStatus) return order;
 
@@ -450,8 +470,18 @@ export class OrdersService {
         dto.actor ?? null,
       );
 
+      changed = true;
       return this.findOneOrFail(id);
     });
+
+    if (changed) {
+      void this.mailer.notify(
+        order,
+        { type: 'payment', to: dto.paymentStatus },
+        dto.note,
+      );
+    }
+    return order;
   }
 
   async updateAdminNote(

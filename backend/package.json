@@ -20,6 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "set-role": "node scripts/set-role.mjs",
     "seed:vn": "ts-node scripts/seed-vn-administrative.ts",
+    "email:preview": "ts-node scripts/preview-order-emails.ts && ts-node scripts/preview-candidate-emails.ts",
+    "mail:test": "ts-node scripts/send-test-mail.ts",
     "db:import-sqlite": "ts-node scripts/import-sqlite.ts",
     "migrate": "ts-node scripts/migrate.ts",
     "migrate:prod": "node dist/scripts/migrate.js"
@@ -32,6 +34,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "mysql2": "^3.24.5",
+    "nodemailer": "^10.0.15",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sanitize-html": "2.17.0"
@@ -45,6 +48,7 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/sanitize-html": "^2.16.2",
     "@types/supertest": "^7.0.0",
     "eslint": "^9.18.0",

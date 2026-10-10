@@ -320,3 +320,32 @@ export function SlidersIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function BriefcaseIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="7" width="18" height="13" rx="2.5" />
+      <path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7" />
+      <path d="M3 12.5h18M10.5 12.5v1.5h3v-1.5" />
+    </Icon>
+  );
+}
+
+export function IdCardIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <circle cx="9" cy="11" r="2.25" />
+      <path d="M5.75 16.5a3.5 3.5 0 0 1 6.5 0M14.5 10h3.5M14.5 13.5h3.5" />
+    </Icon>
+  );
+}
+
+export function CalendarIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+    </Icon>
+  );
+}
